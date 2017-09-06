@@ -1,6 +1,7 @@
 import math
 from sympy import *
 from copy import deepcopy
+import numpy as np
 
 
 # Object for holding the result of a bracket operation.
@@ -102,14 +103,41 @@ class LieAlgebra:
         for key1, key2 in sorted(self.brackets):
             res = self.brackets[(key1, key2)]
 
-            # Doubling the bracket acts as an escape character (i.e. '{{' becomes '{' in the final output),
-            # and we need the keys to be inside of brackets before being converted to Latex
+            # Doubling the bracket acts as an escape character
+            # (i.e. '{{' becomes '{' in the final output),
+            # and we need the keys to be inside of brackets
+            # before being converted to Latex
             # so that multiple digits stick together inside of a subscript.
             bracketFormat = latex("[X_{{{}}},X_{{{}}}]".format(key1, key2))
             resultFormat = latex(res.alpha * Symbol("X" + str(res.index)))
 
             print("$${} = {}$$".format(bracketFormat, resultFormat))
 
+    def CreateY(self):
+        numTriples = len(self.brackets)
+        I = np.identity(self.dimension)
+        Y = np.zeros((numTriples, self.dimension))
+        i = 0
+        for key1, key2 in sorted(self.brackets):
+            key3 = self.brackets[(key1, key2)].index
+            Y[i] = I[key1-1] + I[key2-1] - I[key3-1]
+            i = i + 1
+        print(Y)
+        rank = np.linalg.matrix_rank(Y)
+        corank = numTriples - rank
+        print('rank = {}, corank = {}'.format(rank, corank))
+        """
+
+            # Doubling the bracket acts as an escape character
+            # (i.e. '{{' becomes '{' in the final output),
+            # and we need the keys to be inside of brackets
+            # before being converted to Latex
+            # so that multiple digits stick together inside of a subscript.
+            bracketFormat = latex("[X_{{{}}},X_{{{}}}]".format(key1, key2))
+            resultFormat = latex(res.alpha * Symbol("X" + str(res.index)))
+
+            print("$${} = {}$$".format(bracketFormat, resultFormat))
+            """
     def PrintJacobiToTest(self):
         for triple in self.JacobiToTest:
             res = self.JacobiTestResults[triple]
@@ -233,9 +261,11 @@ def PrintFoundLieAlgebras(LAFound):
     # If only one LA was provided there is no need to loop.
     if type(LAFound) == LieAlgebra:
         PrintExtendedLA(LAFound)
+        LAFound.CreateY()
     else:
         for LA in LAFound:
             PrintExtendedLA(LA)
+            LA.CreateY()
 
 
 def PrintExtendedLA(LA):
@@ -265,4 +295,4 @@ def RecursiveExtension(LA, depth, start=True):
 
 L4 = LieAlgebra(name="L", dimension=4)
 
-RecursiveExtension(LA=L4, depth=5)
+RecursiveExtension(LA=L4, depth=2)
