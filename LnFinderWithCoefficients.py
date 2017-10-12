@@ -156,46 +156,77 @@ def GetEqTerm(res):
 
 # Check if a 'd' value is valid for a given 'n'.
 def IsValidD(n, d):
+    #print("***** valid " + str(n) + " " + str(d))
     if n - d % 2 == 0:
-        return (n - 2) > d
+        #return (n - 2) > d
+        valid = (n - 2) > d
     else:
-        return (n - 1) > d
+        #return (n - 1) > d
+        valid = (n - 1) > d
+    #print("isValidD returning {}".format(valid))
+    return valid
 
 
 # Extends a lie algebra.
 # If a d value is supplied, only a single lie algebra is returned.
 # Otherwise, a list of lie algebras is returned (one for each valid d value).
+# TODO
+#def ExtendLieAlgebra(LA, d, tryAllDValues):
 def ExtendLieAlgebra(LA, d=0):
     NewLieList = []
+    if LA.type == 'B':
+        return NewLieList
 
+    # TODO
     if d == 0:
-        d = LA.d  # Start d value
+        d = LA.d # start d value
+    #if tryAllDValues:
+        # Find type A extensions as long as d is valid given LA.dimension
         while IsValidD(LA.dimension, d):
-            NewLieList.append(GenerateExtendedLA(LA, d))
+            newLA = GenerateExtendedLA(LA, d, extType='A')
+            NewLieList.append(newLA)
+            # Generate extended type B LA from newLA
+            newLA_B = GenerateExtendedLA(newLA, newLA.d, extType='B')
+            NewLieList.append(newLA_B)
             d += 1
         return NewLieList
     else:
-        return GenerateExtendedLA(LA, d)
+        newLA = GenerateExtendedLA(LA, d, extType='A')
+        #return newLA
+        NewLieList.append(newLA)
+        # Generate extended type B LA from newLA
+        newLA_B = GenerateExtendedLA(newLA, newLA.d, extType='B')
+        NewLieList.append(newLA_B)
+        return NewLieList
 
 
 # Accepts a lie algebra and a d value, increments the dimension, and then adds the new brackets.
-def GenerateExtendedLA(LA, d):
+def GenerateExtendedLA(LA, d, extType):
     n = LA.dimension
     n2 = n + 1  # The dimension of the new Lie Algebras
 
     LastValue = n + d - 1  # The last eigenvalue
+    if extType == 'B':
+        LastValue = n + 2*d - 2
 
     NewLieAlg = deepcopy(LA)
     NewLieAlg.extension += 1
     NewLieAlg.dimension += 1
     NewLieAlg.d = d
-    NewLieAlg.AddBracket(1, n, n2)
+    NewLieAlg.type = extType
+    if extType == 'A':
+        NewLieAlg.AddBracket(1, n, n2)
+    else:
+        NewLieAlg.AddBracket(2, n, n2)
 
     # Odd case
+    startValue = d
+    if extType == 'B':
+        startValue = d+1
     if (n - d) % 2 != 0:
         CenterValue = int(LastValue / 2)
 
-        for i in range(d, CenterValue):
+        for i in range(startValue, CenterValue):
             j = LastValue - i
             NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d)
 
@@ -203,7 +234,7 @@ def GenerateExtendedLA(LA, d):
     else:
         CenterValue = int((LastValue - 1) / 2)
 
-        for i in range(d, CenterValue + 1):
+        for i in range(startValue, CenterValue + 1):
             j = LastValue - i
             NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d)
 
@@ -237,7 +268,6 @@ def PrintFoundLieAlgebras(LAFound):
         for LA in LAFound:
             PrintExtendedLA(LA)
 
-
 def PrintExtendedLA(LA):
     TestAllJacobi(LA)
     sectionFormat = latex("m_{{{}}}({}, {})".format(str(LA.extension) + LA.type, LA.d, LA.dimension))
@@ -251,6 +281,8 @@ def PrintExtendedLA(LA):
 def RecursiveExtension(LA, depth, start=True):
     # For the first call, try all d values.
     if start is True:
+        # TODO
+        #LAFound = ExtendLieAlgebra(LA, LA.d, tryAllDValues=True)
         LAFound = ExtendLieAlgebra(LA)
         PrintFoundLieAlgebras(LAFound)
 
@@ -258,11 +290,19 @@ def RecursiveExtension(LA, depth, start=True):
             RecursiveExtension(NewLA, depth - 1, False)
 
     elif depth > 0:
+        # TODO
+        #LAFound = ExtendLieAlgebra(LA, LA.d, tryAllDValues=False)
         LAFound = ExtendLieAlgebra(LA, d=LA.d)
         PrintFoundLieAlgebras(LAFound)
-        RecursiveExtension(LAFound, depth - 1, False)
+        for NewLA in LAFound:
+            RecursiveExtension(NewLA, depth - 1, False)
+        #RecursiveExtension(LAFound, depth - 1, False)
 
 
 L4 = LieAlgebra(name="L", dimension=4)
+
+print("***************************************************************************")
+print("***************************************************************************")
+print("***************************************************************************")
 
 RecursiveExtension(LA=L4, depth=5)
