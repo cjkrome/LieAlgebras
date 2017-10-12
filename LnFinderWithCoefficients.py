@@ -292,11 +292,11 @@ def PrintFoundLieAlgebras(LAFound):
     # If only one LA was provided there is no need to loop.
     if type(LAFound) == LieAlgebra:
         PrintExtendedLA(LAFound)
-        LAFound.CreateY()
+        #LAFound.CreateY()
     else:
         for LA in LAFound:
             PrintExtendedLA(LA)
-            LA.CreateY()
+            #LA.CreateY()
 
 def PrintExtendedLA(LA):
     TestAllJacobi(LA)
