@@ -308,31 +308,29 @@ def PrintExtendedLA(LA):
     print("\n")
 
 
-def RecursiveExtension(LA, depth, start=True):
+def RecursiveExtension(LA, depth, start=True, output=True):
+    ret = []
     # For the first call, try all d values.
     if start is True:
         # TODO
         #LAFound = ExtendLieAlgebra(LA, LA.d, tryAllDValues=True)
         LAFound = ExtendLieAlgebra(LA)
-        PrintFoundLieAlgebras(LAFound)
-
+        if output:
+            PrintFoundLieAlgebras(LAFound)
+        ret.extend(LAFound)
         for NewLA in LAFound:
-            RecursiveExtension(NewLA, depth - 1, False)
+            ret.extend(RecursiveExtension(NewLA, depth - 1, False, output))
 
     elif depth > 0:
         # TODO
         #LAFound = ExtendLieAlgebra(LA, LA.d, tryAllDValues=False)
         LAFound = ExtendLieAlgebra(LA, d=LA.d)
-        PrintFoundLieAlgebras(LAFound)
+        ret.extend(LAFound)
+        if output:
+            PrintFoundLieAlgebras(LAFound)
         for NewLA in LAFound:
-            RecursiveExtension(NewLA, depth - 1, False)
+            ret.extend(RecursiveExtension(NewLA, depth - 1, False, output))
         #RecursiveExtension(LAFound, depth - 1, False)
+    return ret
 
 
-L4 = LieAlgebra(name="L", dimension=4)
-
-print("***************************************************************************")
-print("***************************************************************************")
-print("***************************************************************************")
-
-RecursiveExtension(LA=L4, depth=5)
