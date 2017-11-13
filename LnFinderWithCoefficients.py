@@ -154,25 +154,62 @@ class LieAlgebra:
 def TestAllJacobi(LA):
     d = LA.d
     n = LA.dimension
-    if d < (n-4)/2:
-        for j in range(2, LA.dimension - 2):
-            for k in range(j + 1, LA.dimension - 1):
-                ej = LA.ConvertIndexToEigenvalue(index=j)
-                ek = LA.ConvertIndexToEigenvalue(index=k)
-                emax = LA.ConvertIndexToEigenvalue(LA.dimension)
-                if ej + ek + 1 == emax:
-                    resultset = TestJacobi(LA, 1, j, k)
-                    if resultset is not False:
-                        LA.JacobiToTest.append((1, j, k))
-                        LA.JacobiTestResults[(1, j, k)] = resultset
-    else:
-        Y = LA.CreateY()
-        #U = Y.transpose()
-        #print(U)
-        msg = "TestAllJacobi condition not met: d={} n={}".format(d, n)
-        print(msg)
-        #raise Exception(msg)
+    #if d < (n-4)/2:
+#    if False:
+#        for j in range(2, LA.dimension - 2):
+#            for k in range(j + 1, LA.dimension - 1):
+#                ej = LA.ConvertIndexToEigenvalue(index=j)
+#                ek = LA.ConvertIndexToEigenvalue(index=k)
+#                emax = LA.ConvertIndexToEigenvalue(LA.dimension)
+#                if ej + ek + 1 == emax:
+#                    resultset = TestJacobi(LA, 1, j, k)
+#                    if resultset is not False:
+#                        LA.JacobiToTest.append((1, j, k))
+#                        LA.JacobiTestResults[(1, j, k)] = resultset
+    #else:
+    #    if LA.type == "A":
+    #        JacobiTestsFromY(LA)
+                
+    #    msg = "TestAllJacobi condition not met: d={} n={}".format(d, n)
+    #    print(msg)
+
+    if LA.type == "A":
+        JacobiTestsFromY(LA)
                     
+def JacobiTestsFromY(LA):
+    Y = LA.CreateY()
+    #print("Y = \n{}".format(Y))
+    U = np.dot(Y, Y.transpose())
+    #print("U = \n{}".format(U))
+    negOnes = np.where(U == -1)
+    #print(negOnes[0])
+    allIndices = []
+    for i in range(len(negOnes[0])):
+        idx0 = negOnes[0][i]
+        idx1 = negOnes[1][i]
+        #print("Y[{}] = {}".format(idx0, Y[idx0]))
+        sum = np.add(Y[idx0], Y[idx1])
+        #print(sum)
+        indices = np.where(sum == 1)
+        #print(indices)
+        isIn = False
+        for i in allIndices:
+            isIn = isIn or np.array_equal(indices, i)
+        if not isIn:
+            allIndices.append(indices)
+    #print(allIndices)
+    LA.JacobiToTest = []
+    for indices in allIndices:
+        i = indices[0][0]+1
+        j = indices[0][1]+1
+        k = indices[0][2]+1
+        resultset = TestJacobi(LA, i, j, k)
+        #print(resultset)
+        if resultset is not False:
+            LA.JacobiToTest.append((i, j, k))
+            print("appending {} len = {}".format((i,j,k), len(LA.JacobiToTest)))
+            LA.JacobiTestResults[(i, j, k)] = resultset
+
 
 # Test an individual triple to see if it is trivial.
 def TestJacobi(LA, i, j, k):
@@ -279,11 +316,14 @@ def PrintFoundLieAlgebras(LAFound):
             #LA.CreateY()
 
 def PrintExtendedLA(LA):
+    print("Testing Jacobi: {}, {}".format(LA.d, LA.dimension));
     TestAllJacobi(LA)
+    print("Printing Jacobi: {}, {}".format(LA.d, LA.dimension));
     sectionFormat = latex("m_{{{}}}({}, {})".format(str(LA.extension) + LA.type, LA.d, LA.dimension))
     print("\section{{{}}}".format(sectionFormat))
     LA.PrintBrackets()
     print("\nNon-trivial Jacobi Tests:")
+    #TestAllJacobi(LA)
     LA.PrintJacobiToTest()
     print("\n")
 
