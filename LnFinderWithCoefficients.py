@@ -119,13 +119,16 @@ class LieAlgebra:
         Y = np.zeros((numTriples, self.dimension))
         i = 0
         for key1, key2 in sorted(self.brackets):
+            # key1 and key2 are indices
             key3 = self.brackets[(key1, key2)].index
+            print("{}, {}, {}, {}, {}".format(key1, key2, key3, self.d, self.dimension))
             Y[i] = I[key1-1] + I[key2-1] - I[key3-1]
             i = i + 1
-        print(Y)
+        #print(Y)
         rank = np.linalg.matrix_rank(Y)
         corank = numTriples - rank
-        print('rank = {}, corank = {}'.format(rank, corank))
+        #print('rank = {}, corank = {}'.format(rank, corank))
+        return Y
         """
 
             # Doubling the bracket acts as an escape character
@@ -149,17 +152,27 @@ class LieAlgebra:
 
 # Find all of the non-trivial triples that need to be tested.
 def TestAllJacobi(LA):
-    for j in range(2, LA.dimension - 2):
-        for k in range(j + 1, LA.dimension - 1):
-            ej = LA.ConvertIndexToEigenvalue(index=j)
-            ek = LA.ConvertIndexToEigenvalue(index=k)
-            emax = LA.ConvertIndexToEigenvalue(LA.dimension)
-            if ej + ek + 1 == emax:
-                resultset = TestJacobi(LA, 1, j, k)
-                if resultset is not False:
-                    LA.JacobiToTest.append((1, j, k))
-                    LA.JacobiTestResults[(1, j, k)] = resultset
-
+    d = LA.d
+    n = LA.dimension
+    if d < (n-4)/2:
+        for j in range(2, LA.dimension - 2):
+            for k in range(j + 1, LA.dimension - 1):
+                ej = LA.ConvertIndexToEigenvalue(index=j)
+                ek = LA.ConvertIndexToEigenvalue(index=k)
+                emax = LA.ConvertIndexToEigenvalue(LA.dimension)
+                if ej + ek + 1 == emax:
+                    resultset = TestJacobi(LA, 1, j, k)
+                    if resultset is not False:
+                        LA.JacobiToTest.append((1, j, k))
+                        LA.JacobiTestResults[(1, j, k)] = resultset
+    else:
+        Y = LA.CreateY()
+        #U = Y.transpose()
+        #print(U)
+        msg = "TestAllJacobi condition not met: d={} n={}".format(d, n)
+        print(msg)
+        #raise Exception(msg)
+                    
 
 # Test an individual triple to see if it is trivial.
 def TestJacobi(LA, i, j, k):

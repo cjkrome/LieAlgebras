@@ -18,7 +18,7 @@ L9 = LieAlgebra(name="L", dimension=9)
 L10 = LieAlgebra(name="L", dimension=10)
 L11 = LieAlgebra(name="L", dimension=11)
 
-Ls = [ L4, L5 ]
+Ls = [ L4 ] #L5, L6, L7, L8, L9, L10, L11 ]
 
 #algebras = RecursiveExtension(LA=L4, depth=3, output=True)
 #algebras = RecursiveExtension(LA=L5, depth=3, output=True)
