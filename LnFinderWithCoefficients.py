@@ -2,7 +2,23 @@ import math
 from sympy import *
 from copy import deepcopy
 import numpy as np
+import scipy
 
+#------------------------------------------------------------------------------
+# Class Restrict
+#------------------------------------------------------------------------------
+
+# Utility class
+class Restrict:
+    def __init__(self, d, dimension, extension, type):
+        self.d = d
+        self.dimension = dimension
+        self.extension = extension
+        self.type = type
+
+#------------------------------------------------------------------------------
+# Class BracketResult
+#------------------------------------------------------------------------------
 
 # Object for holding the result of a bracket operation.
 # Constructor parameters:
@@ -23,6 +39,10 @@ class BracketResult:
         return bracketcopy
 
 
+#------------------------------------------------------------------------------
+# Class LieAlgebra
+#------------------------------------------------------------------------------
+
 # A lie algebra object.
 # Constructor parameters:
 #   1. dimension - the dimension of the algebra.
@@ -42,6 +62,7 @@ class LieAlgebra:
         self.extension = 0
         self.JacobiToTest = []
         self.JacobiTestResults = {}
+        self.JacobiTestResults2 = {}
         self.type = None
 
         # If "L" is the name provided, brackets [X1, Xi] = X(i+1) for (i=1,...,n-1) should be added.
@@ -54,6 +75,15 @@ class LieAlgebra:
         # j = 2
         # AddBracket(1, 2, 3)
 
+    # r = restrictions
+    def matches(self, r):
+        if r == None:
+            return True
+        return (self.d == r.d and
+                self.dimension == r.dimension and
+                (r.extension == None or self.extension == r.extension) and
+                self.type == r.type)
+
     # Accepts i, j, and k as indices and then adds a new bracket to the lie algebra.
     # (Alpha is optional and defaults to 1)
     def AddBracket(self, i, j, k, alpha=1):
@@ -61,10 +91,10 @@ class LieAlgebra:
         self.brackets[i, j] = res
 
     # Accepts i, j, and k as eigenvalues, converts them to indices, and then uses the indices to add a bracket.
-    def AddEigenvalueBracket(self, i, j, k, d):
-        i = self.ConvertEigenvalueToIndex(i, d)
-        j = self.ConvertEigenvalueToIndex(j, d)
-        k = self.ConvertEigenvalueToIndex(k, d)
+    def AddEigenvalueBracket(self, i, j, k, d, n, extType):
+        i = self.ConvertEigenvalueToIndex(i, d, n, extType)
+        j = self.ConvertEigenvalueToIndex(j, d, n, extType)
+        k = self.ConvertEigenvalueToIndex(k, d, n, extType)
 
         # This format ensures correct Latex printing:
         alphatext = "alpha_" + str(i) + "," + str(j) + "^" + str(k) + ""
@@ -94,11 +124,19 @@ class LieAlgebra:
             d = self.d
         return index + d - 2
 
-    def ConvertEigenvalueToIndex(self, eigenval, d=0):
+    def ConvertEigenvalueToIndex(self, eigenval, d, n, extType):
         if d == 0:
-            d = self.d
-        return eigenval - d + 2
-
+            # if d is zero, then set it to self.d
+            raise "d == 0"
+        if eigenval == 1:
+            raise "eigenval == 1"
+        if extType == 'A':
+            return eigenval - d + 2
+        else:
+            if eigenval < n + 2 * d - 3:
+                return eigenval - d + 2
+            return n+1
+        
     def PrintBrackets(self):
         for key1, key2 in sorted(self.brackets):
             res = self.brackets[(key1, key2)]
@@ -113,6 +151,22 @@ class LieAlgebra:
 
             print("$${} = {}$$".format(bracketFormat, resultFormat))
 
+
+        # Testing out groebner bases to solve Jacobi equations
+    def TestJacobiGroebner(self):
+        name2sym = { 'alpha_2,5^8' : 'x5' }
+
+        #print("Testing groebner")
+        for triple in self.JacobiToTest:
+            res = self.JacobiTestResults2[triple]
+            print("triple")
+            for r in res:
+                if type(r) == Mul:
+                    first, second = r.as_two_terms()
+                    print(name2sym.get(first, first), name2sym.get(second.name, second))
+                    print(type(second))
+            #print("Jacobi results for {}: $${}$$".format(triple, latex(res)))
+
     def CreateY(self):
         numTriples = len(self.brackets)
         I = np.identity(self.dimension)
@@ -121,7 +175,7 @@ class LieAlgebra:
         for key1, key2 in sorted(self.brackets):
             # key1 and key2 are indices
             key3 = self.brackets[(key1, key2)].index
-            print("{}, {}, {}, {}, {}".format(key1, key2, key3, self.d, self.dimension))
+            #print("{}, {}, {}, {}, {}".format(key1, key2, key3, self.d, self.dimension))
             Y[i] = I[key1-1] + I[key2-1] - I[key3-1]
             i = i + 1
         #print(Y)
@@ -150,6 +204,10 @@ class LieAlgebra:
         self.JacobiToTest.append(triple)
 
 
+#------------------------------------------------------------------------------
+# Functions
+#------------------------------------------------------------------------------
+
 # Find all of the non-trivial triples that need to be tested.
 def TestAllJacobi(LA):
     d = LA.d
@@ -176,6 +234,7 @@ def TestAllJacobi(LA):
     if LA.type == "A":
         JacobiTestsFromY(LA)
                     
+
 def JacobiTestsFromY(LA):
     Y = LA.CreateY()
     #print("Y = \n{}".format(Y))
@@ -204,11 +263,13 @@ def JacobiTestsFromY(LA):
         j = indices[0][1]+1
         k = indices[0][2]+1
         resultset = TestJacobi(LA, i, j, k)
+        resultset2 = TestJacobi2(LA, i, j, k)
         #print(resultset)
         if resultset is not False:
             LA.JacobiToTest.append((i, j, k))
-            print("appending {} len = {}".format((i,j,k), len(LA.JacobiToTest)))
+            #print("appending {} len = {}".format((i,j,k), len(LA.JacobiToTest)))
             LA.JacobiTestResults[(i, j, k)] = resultset
+            LA.JacobiTestResults2[(i, j, k)] = resultset2
 
 
 # Test an individual triple to see if it is trivial.
@@ -218,6 +279,16 @@ def TestJacobi(LA, i, j, k):
     r3 = LA.Bracket(k, LA.Bracket(i, j))
     if r1 != 0 or r2 != 0 or r3 != 0:
         return Eq(GetEqTerm(r1) + GetEqTerm(r2) + GetEqTerm(r3))
+        # return (r1, r2, r3)
+    else:
+        return False
+# Test an individual triple to see if it is trivial.
+def TestJacobi2(LA, i, j, k):
+    r1 = LA.Bracket(i, LA.Bracket(j, k))
+    r2 = LA.Bracket(j, LA.Bracket(k, i))
+    r3 = LA.Bracket(k, LA.Bracket(i, j))
+    if r1 != 0 or r2 != 0 or r3 != 0:
+        return (GetEqTerm(r1), GetEqTerm(r2), GetEqTerm(r3))
         # return (r1, r2, r3)
     else:
         return False
@@ -273,7 +344,7 @@ def GenerateExtendedLA(LA, d, extType):
 
         for i in range(startValue, CenterValue):
             j = LastValue - i
-            NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d)
+            NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d, n, extType)
 
     # Even case
     else:
@@ -281,7 +352,7 @@ def GenerateExtendedLA(LA, d, extType):
 
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
-            NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d)
+            NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d, n, extType)
 
     return NewLieAlg
 
@@ -300,33 +371,58 @@ def FindNextDimensionTypeB(LA):
 
     for i in range(d, RangeEnd):
         j = LastValue - i
-        NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d)
+        NewLieAlg.AddEigenvalueBracket(i, j, LastValue, d, n, extType)
 
     return NewLieAlg
 
 
-def PrintFoundLieAlgebras(LAFound):
+def PrintFoundLieAlgebras(LAFound, restrict=None):
     # If only one LA was provided there is no need to loop.
     if type(LAFound) == LieAlgebra:
-        PrintExtendedLA(LAFound)
-        #LAFound.CreateY()
+        PrintExtendedLA(LAFound, restrict)
+        #Y = LAFound.CreateY()
+        #print("Y = {}".format(Y))
     else:
         for LA in LAFound:
-            PrintExtendedLA(LA)
+            PrintExtendedLA(LA, restrict)
             #LA.CreateY()
 
-def PrintExtendedLA(LA):
-    print("Testing Jacobi: {}, {}".format(LA.d, LA.dimension));
-    TestAllJacobi(LA)
-    print("Printing Jacobi: {}, {}".format(LA.d, LA.dimension));
-    sectionFormat = latex("m_{{{}}}({}, {})".format(str(LA.extension) + LA.type, LA.d, LA.dimension))
-    print("\section{{{}}}".format(sectionFormat))
-    LA.PrintBrackets()
-    print("\nNon-trivial Jacobi Tests:")
-    #TestAllJacobi(LA)
-    LA.PrintJacobiToTest()
-    print("\n")
+def null(A, eps=1e-15):
+    u, s, vh = np.linalg.svd(A)
+    null_mask = (s <= eps)
+    null_space = scipy.compress(null_mask, vh, axis=0)
+    return np.transpose(null_space)
 
+def PrintExtendedLA(LA, restrict=None):
+    if restrict == None or (LA.matches(restrict)):
+        print("Testing Jacobi: {}, {}".format(LA.d, LA.dimension));
+        TestAllJacobi(LA)
+        print("Printing Jacobi: {}, {}".format(LA.d, LA.dimension));
+        sectionFormat = latex("m_{{{}}}({}, {})".format(str(LA.extension) + LA.type, LA.d, LA.dimension))
+        print("\section{{{}}}".format(sectionFormat))
+        LA.PrintBrackets()
+        print("\nNon-trivial Jacobi Tests:")
+        #TestAllJacobi(LA)
+        """
+        Y = LA.CreateY()
+        print("Y = \n{}".format(Y))
+        nullY = null(Y)
+        print("null(Y) = \n{}".format(nullY))
+        U = np.dot(Y, Y.transpose())
+        print("U = \n{}".format(U))
+        m = Y.shape[0]
+        print("Rank = {}, m = {}".format(np.linalg.matrix_rank(U), m))
+        print("Solving Uv = [1 1 ... 1]'")
+        ones = np.ones((m,1))
+        #print("Ones = {}".format(ones))
+        v = np.linalg.solve(U, ones)
+        print("v = \n{}".format(v))
+        """
+        LA.PrintJacobiToTest()
+        print("\n")
+
+        #LA.TestJacobiGroebner()
+    
 
 # Extends a lie algebra, checking for all possible d values.
 def FirstExtendLieAlgebra(LA):
@@ -361,24 +457,24 @@ def ExtendLieAlgebra(LA):
     NewLieList.append(newLA_B)
     return NewLieList
 
-def RecursiveExtension(LA, depth, output=True):
+def RecursiveExtension(LA, depth, output=True, restrict_output=None):
     ret = []
     if depth > 0:
         LAFound = ExtendLieAlgebra(LA)
         ret.extend(LAFound)
         if output:
-            PrintFoundLieAlgebras(LAFound)
+            PrintFoundLieAlgebras(LAFound, restrict_output)
         for NewLA in LAFound:
-            ret.extend(RecursiveExtension(NewLA, depth - 1, output))
+            ret.extend(RecursiveExtension(NewLA, depth - 1, output, restrict_output))
     return ret
 
-def ExtendL(LA, depth, output=True):
+def ExtendL(LA, depth, output=True, restrict_output=None):
     ret = []
     LAFound = FirstExtendLieAlgebra(LA)
     if output:
-        PrintFoundLieAlgebras(LAFound)
+        PrintFoundLieAlgebras(LAFound, restrict_output)
     ret.extend(LAFound)
     for NewLA in LAFound:
-        ret.extend(RecursiveExtension(NewLA, depth - 1, output))
+        ret.extend(RecursiveExtension(NewLA, depth - 1, output, restrict_output))
     return ret
     
