@@ -6,6 +6,7 @@ from sympy import Symbol
 
 from LnFinderWithCoefficients import LieAlgebra
 from LnFinderWithCoefficients import RecursiveExtension
+from LnFinderWithCoefficients import CreateL
 
 def check_1_A_2_5(la):
     assert la.JacobiToTest == []
@@ -59,7 +60,8 @@ def check_4_A_2_8(la):
     assert la.brackets[3, 5].alpha == Symbol("alpha_3,5^8")
 
 def test_answer():
-    L4 = LieAlgebra(name="L", dimension=4)
+    #L4 = LieAlgebra(name="L", dimension=4)
+    L4 = CreateL(4)
     algebras = RecursiveExtension(LA=L4, depth=5, output=False)
     assert len(algebras) == 10
 

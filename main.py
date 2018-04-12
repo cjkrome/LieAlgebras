@@ -5,11 +5,11 @@ from LnFinderWithCoefficients import RecursiveExtension
 from LnFinderWithCoefficients import ExtendL
 from LnFinderWithCoefficients import *
 
-print("***********************************************************************")
-print("***********************************************************************")
-print("***********************************************************************")
+#print("***********************************************************************")
+#print("***********************************************************************")
+#print("***********************************************************************")
 
-
+"""
 L4 = LieAlgebra(name="L", dimension=4)
 L5 = LieAlgebra(name="L", dimension=5)
 L6 = LieAlgebra(name="L", dimension=6)
@@ -22,12 +22,45 @@ L12 = LieAlgebra(name="L", dimension=12)
 L13 = LieAlgebra(name="L", dimension=13)
 L14 = LieAlgebra(name="L", dimension=14)
 L15 = LieAlgebra(name="L", dimension=15)
+"""
+L4 = create_L(4)
+L5 = create_L(5)
+L6 = create_L(6)
+L7 = create_L(7)
+L8 = create_L(8)
+L9 = create_L(9)
+L10 = create_L(10)
+L11 = create_L(11)
+L12 = create_L(12)
+L13 = create_L(13)
+L14 = create_L(14)
+L15 = create_L(15)
 
 Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
 
-#algebras = RecursiveExtension(LA=L4, depth=3, output=True)
-#algebras = RecursiveExtension(LA=L5, depth=3, output=True)
-
+found = []
 for L in Ls:
-    #RecursiveExtension(LA=L, depth=1, output=True)
-    ExtendL(LA=L, depth=10, output=True, restrict_output=Restrict(3, 12, 5, 'A'))
+    #ExtendL(LA=L, depth=10, output=True,
+    #        output_filter=Filter([2,4], [10], [4,5,6], 'A'))
+
+    # Document for Beau and Sara
+    #found.extend(ExtendL(LA=L, depth=11, output=False,
+    #                     output_filter=None))
+
+    found.extend(ExtendL(LA=L, depth=11))#, output=False,
+                         #output_filter=None))
+
+print('\\documentclass{article}\n\\setlength{\\parindent}{0cm} ' +
+      '% Default is 15pt.\n\\begin{document}\n')
+
+# sort algebras in order of dimension and output
+found.sort(key=lambda la: (la.dimension, la.d, la.extension))
+
+# filter for beau and sara
+#filter = Filter(dimension=[6, 8, 10, 12], type='B')
+#PrintFoundLieAlgebras(found, filter)
+
+filter = Filter(dimension=[6, 8, 10, 12], type='B')
+PrintFoundLieAlgebras(found, filter)
+
+print('\n\\end{document}\n')
