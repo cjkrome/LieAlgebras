@@ -37,6 +37,7 @@ L14 = create_L(14)
 L15 = create_L(15)
 
 Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
+#Ls = [ L4 ]
 
 found = []
 for L in Ls:
@@ -47,20 +48,27 @@ for L in Ls:
     #found.extend(ExtendL(LA=L, depth=11, output=False,
     #                     output_filter=None))
 
-    found.extend(ExtendL(LA=L, depth=11))#, output=False,
-                         #output_filter=None))
+    #found.extend(ExtendL(LA=L, depth=11))
+    found.extend(ExtendL(LA=L, depth=11))
 
 print('\\documentclass{article}\n\\setlength{\\parindent}{0cm} ' +
-      '% Default is 15pt.\n\\begin{document}\n')
+      '% Default is 15pt.')
+print('\\usepackage{amsmath}')
+print('\\setcounter{MaxMatrixCols}{30}')
+print('\\begin{document}')
 
 # sort algebras in order of dimension and output
 found.sort(key=lambda la: (la.dimension, la.d, la.extension))
 
-# filter for beau and sara
-#filter = Filter(dimension=[6, 8, 10, 12], type='B')
+## filter for beau and sara
+filter = Filter(dimension=[6, 8, 10, 12], type='B')
+#filter = Filter(dimension=[6], type='B')
+PrintFoundLieAlgebras(found, filter)
+
+#filter = Filter(dimension=[8], type='A')
 #PrintFoundLieAlgebras(found, filter)
 
-filter = Filter(dimension=[6, 8, 10, 12], type='B')
-PrintFoundLieAlgebras(found, filter)
+#filter = Filter(dimension=[6, 7, 8, 9], type='A')
+#PrintFoundLieAlgebras(found, filter)
 
 print('\n\\end{document}\n')

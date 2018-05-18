@@ -4,6 +4,66 @@ from copy import deepcopy
 import numpy as np
 import scipy
 
+import networkx as nx
+import matplotlib.pyplot as plt
+import string
+
+#------------------------------------------------------------------------------
+# Graph comparison
+#------------------------------------------------------------------------------
+
+def test_degree(G1, G2):
+    G1_degrees = sorted([G1.degree(n) for n in G1.nodes()])
+    G2_degrees = sorted([G2.degree(n) for n in G2.nodes()])
+    return G1_degrees == G2_degrees
+
+def draw(G):
+    edge_colors = ['blue' if w == 1 else 'green' for w in (nx.get_edge_attributes(G, 'weight').values())]
+    #nx.draw_shell(G, with_labels=True, edge_color=edge_colors, node_size=2000)
+    nx.draw_circular(G, with_labels=True, edge_color=edge_colors, node_size=2000)
+    plt.show(block=True)
+    
+# Get all nodes of degree degree
+def degree_nodes(G, degree):
+    return list(filter(lambda n: G.degree(n) == degree, G.nodes()))
+
+# Pre-condition: |G1| == |G2|
+# Run test_degree() before calling this function
+# G1 will take on the values of G2, so G2 will not be modified
+def graphs_equal_impl(G1, G2, G1_unmapped, G2_unmapped):
+    if len(G1_unmapped) == 0:
+        return True
+    n1 = G1_unmapped.pop()
+    deg = G1.degree(n1)
+    G2_nodes = degree_nodes(G2, deg)
+    # For each unvisited node that has the same degree as n1,
+    # check to see if it is compatible with n1 by comparing 
+    # edges with visited (mapped) nodes.
+    for n2 in set(G2_nodes).intersection(G2_unmapped):
+        mapped = n2
+        G1.nodes[n1]['mapped'] = mapped
+        consistent = True
+        # n1 is consistent with n2 if all mapped neighbors to n1
+        # have edges in G2 and those edges have identical labels.
+        for nbr in G1.adj[n1]:
+            nmapped = G1.nodes[nbr]['mapped']
+            if nmapped != '' and (not G2.has_edge(mapped,nmapped)
+                                  or G2[mapped][nmapped]['weight'] != G1[n1][nbr]['weight']):
+                consistent = False
+        if consistent:
+            G1_unmapped_copy = G1_unmapped.copy()
+            G2_unmapped_copy = G2_unmapped.copy()
+            G2_unmapped_copy.remove(n2)
+            if graphs_equal_impl(G1, G2, G1_unmapped_copy, G2_unmapped_copy):
+                return True
+        G1.nodes[n1]['mapped'] = ''
+    return False
+
+def graphs_equal(G1, G2):
+    if not test_degree(G1, G2):
+        return False
+    return graphs_equal_impl(G1, G2, set(G1.nodes()), set(G2.nodes))
+
 #------------------------------------------------------------------------------
 # Class Filter
 #------------------------------------------------------------------------------
@@ -65,6 +125,9 @@ class LieAlgebra:
         self.JacobiTestResults2 = {}
         self.type = None
 
+    def __repr__(self):
+        return 'm{}({},{})'.format(
+            str(self.extension)+self.type, self.d, self.dimension)
 
     # f = filter
     def matches(self, f):
@@ -79,6 +142,8 @@ class LieAlgebra:
     # algebra. (Alpha is optional and defaults to 1)
     def add_bracket(self, i, j, k, alpha=1):
         res = BracketResult(k, alpha)
+        #if self.type == 'B':
+        #    print('bracket for {},{} = {},{}'.format(i, j, k, alpha));
         self.brackets[i, j] = res
 
     # Accepts i, j, and k as eigenvalues, converts them to indices, and then
@@ -88,9 +153,13 @@ class LieAlgebra:
         j = self.convert_eigenvalue_to_index(j, d, n, extType)
         k = self.convert_eigenvalue_to_index(k, d, n, extType)
 
-        # This format ensures correct Latex printing:
-        alphatext = "alpha_{},{}^{}".format(i, j, k)
-        self.add_bracket(i, j, k, Symbol(alphatext))
+        # Hard-code structure constant of 1 for first B extensions
+        if extType == 'B' and i == 2:
+            self.add_bracket(i, j, k)
+        else:
+            # This format ensures correct Latex printing:
+            alphatext = "alpha_{},{}^{}".format(i, j, k)
+            self.add_bracket(i, j, k, Symbol(alphatext))
 
     # Performs the bracket operation [Xi, Xj]
     def bracket(self, i, j):
@@ -278,6 +347,22 @@ def test_all_jacobi(LA):
 def JacobiTestsFromY(LA):
     Y = LA.create_Y()
     U = np.dot(Y, Y.transpose())
+    LA.Y = Y
+    LA.U = U
+
+    # Build U graph
+    LA.G = nx.Graph()
+
+    labels = range(U.shape[0])#['a', 'b', 'c']
+    LA.G.add_nodes_from(labels)
+
+    for x,y in np.ndindex(U.shape):
+        #print(a[x,y])    
+        w = U[x,y]
+        if w != 0:
+            LA.G.add_edge(x, y, weight=w)
+        
+    # Do the rest
     negOnes = np.where(U == -1)
     allIndices = []
     for i in range(len(negOnes[0])):
@@ -345,16 +430,12 @@ def GenerateExtendedLA(LA, d, extType):
         NewLieAlg.add_bracket(2, n, n2)
 
     startValue = d
-    #if extType == 'B':
-    #    startValue = d+1
 
-    #print("d={}, n={}, n2={}, type={}, startValue={}, LastValue={}".format(
-    #          d, n, n2, extType, startValue, LastValue))
+    #print('from {} to {}'.format(LA, NewLieAlg))
+
     # Odd case
     if (n - d) % 2 != 0:
         CenterValue = int(LastValue / 2)
-        #print("Odd: CenterValue={}".format(CenterValue))
-
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
             if i != j:
@@ -363,8 +444,6 @@ def GenerateExtendedLA(LA, d, extType):
     # Even case
     else:
         CenterValue = int((LastValue - 1) / 2.0)
-        #print("Even: CenterValue={}".format(CenterValue))
-
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
             NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType)
@@ -437,11 +516,44 @@ def PrintExtendedLA(LA, filter=None):
         LA.print_jacobi_to_test()
         #print("\n")
 
-        if LA.type == 'A':
+        if True:#LA.type == 'A':
             try:
                 LA.test_jacobi_groebner()
             except:
                 print("****** FAILED JACOBI GROEBNER ******")
+
+        print('$Y=');
+        print('\\begin{bmatrix}')
+        print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
+        print('\\end{bmatrix}')
+        print('$')
+        print()
+
+        print('$U=');
+        print('\\begin{bmatrix}')
+        print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
+        print('\\end{bmatrix}')
+        print('$')
+        print()
+
+        nullU = null(LA.U)
+        print('$null(U)=');
+        print('\\begin{bmatrix}')
+        print(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
+        print('\\end{bmatrix}')
+        print('$')
+        print()
+
+        # Draw the graph
+        #draw(LA.G)
+
+        #print("null(U) = \n{}".format(nullU))
+        #print()
+
+        #print('U');
+        #print('\\begin{tabular}{ccccccccccccccc}')
+        #print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
+        #print('\\end{tabular}')
             
 
 # Extends a lie algebra, checking for all possible d values.
@@ -478,29 +590,21 @@ def ExtendLieAlgebra(LA):
     NewLieList.append(newLA_B)
     return NewLieList
 
-def RecursiveExtension(LA, depth):#, output=True, output_filter=None):
+def RecursiveExtension(LA, depth):
     ret = []
     if depth > 0:
         LAFound = ExtendLieAlgebra(LA)
         ret.extend(LAFound)
-        #if output:
-        #    PrintFoundLieAlgebras(LAFound, output_filter)
         for NewLA in LAFound:
-            ret.extend(RecursiveExtension(NewLA, depth - 1))#, output, output_filter))
+            ret.extend(RecursiveExtension(NewLA, depth - 1))
     return ret
 
-def ExtendL(LA, depth):#, output=True, output_filter=None):
+def ExtendL(LA, depth):
     ret = []
     LAFound = FirstExtendLieAlgebra(LA)
-    #if output:
-    #    PrintFoundLieAlgebras(LAFound, output_filter)
     ret.extend(LAFound)
     for NewLA in LAFound:
-        #ret.extend(RecursiveExtension(NewLA, depth - 1, output, output_filter))
-        ret.extend(RecursiveExtension(NewLA, depth - 1))#, False, output_filter))
-
-    #if output:
-    #    PrintFoundLieAlgebras(ret, output_filter)
+        ret.extend(RecursiveExtension(NewLA, depth - 1))
 
     return ret
     
