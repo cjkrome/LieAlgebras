@@ -58,10 +58,11 @@ print('\\setcounter{MaxMatrixCols}{30}')
 print('\\begin{document}')
 
 # sort algebras in order of dimension and output
-found.sort(key=lambda la: (la.dimension, la.d, la.extension))
+found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))
 
 ## filter for beau and sara
-filter = Filter(dimension=[6, 8, 10, 12], type='B')
+#filter = Filter(dimension=[6, 8, 10, 12], type='B')
+filter = Filter(dimension=range(8,15), type='B', U_matrix=False)
 #filter = Filter(dimension=[6], type='B')
 PrintFoundLieAlgebras(found, filter)
 

@@ -70,11 +70,12 @@ def graphs_equal(G1, G2):
 
 # Utility class
 class Filter:
-    def __init__(self, d=None, dimension=None, extension=None, type=None):
+    def __init__(self, d=None, dimension=None, extension=None, type=None, U_matrix=True):
         self.d = d
         self.dimension = dimension
         self.extension = extension
         self.type = type
+        self.U_matrix = U_matrix
 
 #------------------------------------------------------------------------------
 # Class BracketResult
@@ -136,7 +137,7 @@ class LieAlgebra:
         return ((f.d == None or self.d in f.d) and
                 (f.dimension == None or self.dimension in f.dimension) and
                 (f.extension == None or self.extension in f.extension) and
-                self.type == f.type)
+                (f.type == None or self.type == f.type))
 
     # Accepts i, j, and k as indices and then adds a new bracket to the lie
     # algebra. (Alpha is optional and defaults to 1)
@@ -148,7 +149,7 @@ class LieAlgebra:
 
     # Accepts i, j, and k as eigenvalues, converts them to indices, and then
     # uses the indices to add a bracket.
-    def add_eigenvalue_bracket(self, i, j, k, d, n, extType):
+    def add_eigenvalue_bracket(self, i, j, k, d, n, extType, ext):
         i = self.convert_eigenvalue_to_index(i, d, n, extType)
         j = self.convert_eigenvalue_to_index(j, d, n, extType)
         k = self.convert_eigenvalue_to_index(k, d, n, extType)
@@ -156,6 +157,8 @@ class LieAlgebra:
         # Hard-code structure constant of 1 for first B extensions
         if extType == 'B' and i == 2:
             self.add_bracket(i, j, k)
+        elif extType == 'A' and ext == 1:
+            self.add_bracket(i, j, k, (-1)**i)
         else:
             # This format ensures correct Latex printing:
             alphatext = "alpha_{},{}^{}".format(i, j, k)
@@ -241,7 +244,11 @@ class LieAlgebra:
 
         for triple in self.JacobiToTest:
             eqn = self.JacobiTestResults[triple]
-            print("Jacobi identity for {}: $$\\displaystyle {}$$ $${}$$".format(triple, latex(eqn), latex(eqn.subs(old2new))))
+            #if latex(eqn) == 'True':
+            #print('$${}$$'.format(eqn))
+            #if '{}'.format(eqn) == 'True':
+            if eqn != True:
+                print("Jacobi identity for {}: $$\\displaystyle {}$$ $${}$$".format(triple, latex(eqn), latex(eqn.subs(old2new))))
 
         print()
         # do substitution
@@ -292,7 +299,10 @@ class LieAlgebra:
         for triple in self.JacobiToTest:
             res = self.JacobiTestResults[triple]
             #print("Jacobi identity for \\{{e_{}, e_{}, e_{}\\}}: $\\displaystyle {}$\\\\".format(triple, latex(res)))
-            print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], latex(res)))
+            if res != True:
+                print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], latex(res)))
+            else:
+                print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], '0=0'))
 
     def add_jacobi_to_test(self, triple):
         self.JacobiToTest.append(triple)
@@ -429,6 +439,7 @@ def GenerateExtendedLA(LA, d, extType):
     else:
         NewLieAlg.add_bracket(2, n, n2)
 
+    extension = NewLieAlg.extension
     startValue = d
 
     #print('from {} to {}'.format(LA, NewLieAlg))
@@ -439,14 +450,14 @@ def GenerateExtendedLA(LA, d, extType):
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
             if i != j:
-                NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType)
+                NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType, extension)
 
     # Even case
     else:
         CenterValue = int((LastValue - 1) / 2.0)
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
-            NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType)
+            NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType, extension)
 
     return NewLieAlg
 
@@ -522,38 +533,31 @@ def PrintExtendedLA(LA, filter=None):
             except:
                 print("****** FAILED JACOBI GROEBNER ******")
 
-        print('$Y=');
-        print('\\begin{bmatrix}')
-        print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
-        print('\\end{bmatrix}')
-        print('$')
-        print()
+        if filter.U_matrix:
+            print('$Y=');
+            print('\\begin{bmatrix}')
+            print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
+            print('\\end{bmatrix}')
+            print('$')
+            print()
 
-        print('$U=');
-        print('\\begin{bmatrix}')
-        print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
-        print('\\end{bmatrix}')
-        print('$')
-        print()
+            print('$U=');
+            print('\\begin{bmatrix}')
+            print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
+            print('\\end{bmatrix}')
+            print('$')
+            print()
 
-        nullU = null(LA.U)
-        print('$null(U)=');
-        print('\\begin{bmatrix}')
-        print(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
-        print('\\end{bmatrix}')
-        print('$')
-        print()
-
+            nullU = null(LA.U)
+            print('$null(U)=');
+            print('\\begin{bmatrix}')
+            print(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
+            print('\\end{bmatrix}')
+            print('$')
+            print()
+        
         # Draw the graph
         #draw(LA.G)
-
-        #print("null(U) = \n{}".format(nullU))
-        #print()
-
-        #print('U');
-        #print('\\begin{tabular}{ccccccccccccccc}')
-        #print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
-        #print('\\end{tabular}')
             
 
 # Extends a lie algebra, checking for all possible d values.
