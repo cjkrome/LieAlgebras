@@ -330,17 +330,20 @@ class LieAlgebra:
         corank = numTriples - rank
         return Y
 
-    def print_jacobi_tests(self, lines):
+    def print_jacobi_tests_impl(self, lines, tests):
         lines.append('\\begin{align*}')
-        for triple,eqn in self.jacobi_tests.items():
+        for triple,eqn in tests.items():
             triple_str = '(e_{{{}}}, e_{{{}}}, e_{{{}}})'.format(
                 triple[0], triple[1], triple[2]);
             if eqn == False:
-                lines.append("{}: & INVALID\\\\".format(triple_str))
+                lines.append("{}: & \\quad INVALID\\\\".format(triple_str))
             else:
-                lines.append("{}: & \\displaystyle {}\\\\".format(
-                    triple_str, latex(eqn)))
+                lines.append("{}: & \\quad \\displaystyle {} &&= 0\\\\".format(
+                    triple_str, latex(eqn.lhs)))
         lines.append('\\end{align*}')
+
+    def print_jacobi_tests(self, lines):
+        self.print_jacobi_tests_impl(lines, self.jacobi_tests)
 
         if self.gsolutions == None:
             lines.append('There are no solutions.\\\\')
@@ -362,15 +365,19 @@ class LieAlgebra:
             return
 
         # Show the symbol substitution
+        lines.append('\\textit{How the solution was or was not found:}\\\\')
         lines.append('Change variables\\\\')
         for o,n in self.old2new:
             lines.append('$${} \\rightarrow {}$$'.format(latex(o), latex(n)))
 
         # Print the Jacobi tests
         lines.append('Jacobi Tests\\\\')
-        for triple,eqn in self.jacobi_tests.items():
-            lines.append("Jacobi identity for {}: $${}$$".format(
-                triple, latex(eqn.subs(self.old2new))))
+        tests = {key:eqn.subs(self.old2new)
+                 for key,eqn in self.jacobi_tests.items()}
+        self.print_jacobi_tests_impl(lines, tests)
+        #for triple,eqn in self.jacobi_tests.items():
+        #    lines.append("Jacobi identity for {}: $${}$$".format(
+        #        triple, latex(eqn.subs(self.old2new))))
 
         # Print the equations in the Groebner basis
         lines.append('Groebner basis\\\\')
@@ -437,7 +444,12 @@ def extend_LA(LA, d, extType):
     if extType == 'B':
         LastValue = n2 + 2*d - 3
 
-    new_LA = deepcopy(LA)
+    try:
+        new_LA = deepcopy(LA)
+    except:
+        print('Failed to extend {}: failure in deep copy'.format(LA))
+        raise
+
     new_LA.extension += 1
     new_LA.dimension += 1
     new_LA.d = d
@@ -578,8 +590,9 @@ def FirstExtendLieAlgebra(LA):
         newLA = extend_LA(LA, d, extType='A')
         NewLieList.append(newLA)
         # Generate extended type B LA from newLA
-        newLA_B = extend_LA(newLA, newLA.d, extType='B')
-        NewLieList.append(newLA_B)
+        if newLA.dimension % 2 == 1:
+            newLA_B = extend_LA(newLA, newLA.d, extType='B')
+            NewLieList.append(newLA_B)
         d += 2
     return NewLieList
 
@@ -590,11 +603,21 @@ def ExtendLieAlgebra(LA):
         return NewLieList
 
     d = LA.d # start d value
-    newLA = extend_LA(LA, d, extType='A')
-    NewLieList.append(newLA)
-    # Generate extended type B LA from newLA
-    newLA_B = extend_LA(newLA, newLA.d, extType='B')
-    NewLieList.append(newLA_B)
+    try:
+        newLA = extend_LA(LA, d, extType='A')
+        NewLieList.append(newLA)
+
+        # Generate extended type B LA from newLA
+        if newLA.dimension % 2 == 1:
+            try:
+                newLA_B = extend_LA(newLA, newLA.d, extType='B')
+                NewLieList.append(newLA_B)
+            except:
+                print('Failed B extension of {}'.format(newLA))
+    except:
+        print('Failed A extension of {}'.format(LA))
+
+
     return NewLieList
 
 def RecursiveExtension(LA, depth):
@@ -642,7 +665,7 @@ def print_latex(LAs):
         for LA in LAs[i*num_per_col:stop]:
             s = LA.gsolutions
             sol = '' if s == None else '?' if type(s) == str else '$\\surd$'
-            lines.append('{} & {} & {} \\\\'.format(
+            lines.append('\\tiny{{{}}} & {} & {} \\\\'.format(
                 LA.simple_repr(), LA.latex_repr(), sol))
             lines.append('\hline')
         lines.append('\\end{tabular}')

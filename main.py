@@ -21,14 +21,15 @@ L15 = create_L(15)
 Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
 
 found = []
-#for L in Ls:
-for L in Ls[6:12]:
-    #found.extend(ExtendL(LA=L, depth=11))
-    found.extend(ExtendL(LA=L, depth=2))
+max_dim = 14
+for L in Ls:
+    if L.dimension < max_dim:
+        found.extend(ExtendL(LA=L, depth=max_dim-L.dimension))
 
 
 # sort algebras in order of dimension and output
-found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))
+#found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))
+found.sort(key=lambda la: (la.type, la.dimension, la.d, la.extension))
 
 #la_filter = Filter(dimension=[6, 8, 10, 12], type='B')
 #la_filter = Filter(dimension=range(6, 10), type='B', U_matrix=False)
