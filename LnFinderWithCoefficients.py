@@ -103,12 +103,17 @@ class BracketResult:
 #------------------------------------------------------------------------------
 # Graph
 #------------------------------------------------------------------------------
-graph = nx.Graph()
+graph = nx.DiGraph()
 def draw_graph():
     #nx.draw_shell(graph, with_labels=True)
     nx.draw_networkx(graph, with_labels=True)
     plt.show(block=True)
     
+
+#------------------------------------------------------------------------------
+# JacobiIdentities
+#------------------------------------------------------------------------------
+#class JacobiIdentities:
 
 #------------------------------------------------------------------------------
 # Class LieAlgebra
@@ -131,14 +136,21 @@ class LieAlgebra:
         self.dimension = dimension
         self.d = 0
         self.extension = 0
-        self.JacobiToTest = []
-        self.JacobiTestResults = {}
-        self.JacobiTestResults2 = {}
+        self.jacobi_tests = {}
         self.type = None
+        self.parent = None
 
     def __repr__(self):
         return 'm{}({},{})'.format(
             str(self.extension)+self.type, self.d, self.dimension)
+
+    def simple_repr(self):
+        return latex("m{}{}{}{}".format(
+            str(self.extension), self.type, self.d, self.dimension))
+
+    def latex_repr(self):
+        return latex("$m_{{{}}}({}, {})$".format(
+            str(self.extension) + self.type, self.d, self.dimension))
 
     # f = filter
     def matches(self, f):
@@ -214,7 +226,8 @@ class LieAlgebra:
                 return eigenval - d + 2
             return n+1
         
-    def print_brackets(self):
+    def print_brackets(self, lines):
+        lines.append('\\begin{align*}')
         for key1, key2 in sorted(self.brackets):
             res = self.brackets[(key1, key2)]
 
@@ -226,84 +239,82 @@ class LieAlgebra:
             bracketFormat = latex("[X_{{{}}},X_{{{}}}]".format(key1, key2))
             resultFormat = latex(res.alpha * Symbol("X" + str(res.index)))
 
-            print("$${} = {}$$".format(bracketFormat, resultFormat))
+            #lines.append("$${} = {}$$".format(bracketFormat, resultFormat))
+            lines.append("{} &= {} \\\\".format(bracketFormat, resultFormat))
+        lines.append('\\end{align*}')
 
 
-        # Testing out groebner bases to solve Jacobi equations
-    def test_jacobi_groebner(self):
-        # print before substitution
-        eqns = [self.JacobiTestResults[triple] for triple in self.JacobiToTest]
-        eqns = list(filter(lambda eqn : eqn != True, eqns))
+    # Find all of the non-trivial triples that need to be tested.
+    def create_jacobi_tests(self):
+        Y = self.create_Y()
+        U = np.dot(Y, Y.transpose())
+        self.Y = Y
+        self.U = U
+    
+        # Build U graph
+        self.G = nx.Graph()
+    
+        labels = range(U.shape[0])#['a', 'b', 'c']
+        self.G.add_nodes_from(labels)
+    
+        for x,y in np.ndindex(U.shape):
+            w = U[x,y]
+            if w != 0:
+                self.G.add_edge(x, y, weight=w)
+            
+        # Do the rest
+        negOnes = np.where(U == -1)
+        allIndices = []
+        for i in range(len(negOnes[0])):
+            idx0 = negOnes[0][i]
+            idx1 = negOnes[1][i]
+            sum = np.add(Y[idx0], Y[idx1])
+            indices = np.where(sum == 1)
+            isIn = False
+            for i in allIndices:
+                isIn = isIn or np.array_equal(indices, i)
+            if not isIn:
+                allIndices.append(indices)
+        #self.JacobiToTest = []
+        for indices in allIndices:
+            i = indices[0][0]+1
+            j = indices[0][1]+1
+            k = indices[0][2]+1
+            resultset = test_jacobi(self, i, j, k)
+            if resultset != None:
+                self.jacobi_tests[(i, j, k)] = resultset
+
+        # Groebner basis and solution
+        eqns = self.jacobi_tests.values()
         if len(eqns) == 0:
-            print('No Groebner equations.')
+            self.gsolutions = []
             return
         for eqn in eqns:
             if eqn == False:
-                print('NO GROEBNER BASIS')
+                self.gsolutions = None
                 return
 
+        # Get the set of all symbols and come up with new
+        # symbols. Since the existing symbols have superscripts
+        # they'll confuse the Groebner routine, so we have
+        # to use replacement variables.
         syms = []
         for eqn in eqns:
             syms.extend(eqn.free_symbols)
         syms = set(syms)
-        #print(syms)
         n = len(syms)
-        new_syms = ['x_{{{}}}'.format(i) for i in range(n)]
-        #print(new_syms)
-        old2new = list(zip(syms, new_syms))
-        #new2old = dict(zip(new_syms, syms))
-        #print("Symbol map: {}".format(['$({}, {})$'.format(latex(o), latex(n)) for o,n in old2new]))
-        for o,n in old2new:
-            print('$${} \\rightarrow {}$$'.format(latex(o), latex(n)))
+        new_syms = ['x_{{{}}}'.format(i) for i in range(1,n+1)]
+        self.old2new = list(zip(syms, new_syms))
+        self.new2old = dict(zip(new_syms, syms))
 
-        #result = groebner(eqns)
-        #for r in result:
-            #print("$${}$$".format(latex(r)))
-        #    print("$${}$$".format(r.free_symbols))
-
-        for triple in self.JacobiToTest:
-            eqn = self.JacobiTestResults[triple]
-            if eqn == False:
-                print("Jacobi identity for {}: INVALID".format(triple))
-            elif eqn != True:
-                print("Jacobi identity for {}: $$\\displaystyle {}$$ $${}$$".format(triple, latex(eqn), latex(eqn.subs(old2new))))
-
-        print()
         # do substitution
-        #subs = [('alpha_4,7^12', 'x1'),
-        #        ('alpha_2,5^8', 'x2'),
-        #    ]
-        eqns = [eqn.subs(old2new) for eqn in eqns]
+        eqns = [eqn.subs(self.old2new) for eqn in eqns]
 
-        #print("In Groebner basis\\\\")
-        #for eqn in eqns:
-        #    print("$${}$$".format(latex(eqn)))
-
-        print("Equations in Groebner basis")
-        geqns = groebner(eqns)
-        for geqn in geqns:
-            print("$${}=0$$".format(latex(geqn)))
-            #print("$${}$$".format(r))
-        #print(solve_poly_system(geqns, *new_syms))
-        #print('gens = ___ {}'.format(geqns.gens))
-        #print('args = ___ {}'.format(geqns.args))
-        #print('domain = ___ {}'.format(geqns.domain))
-        #print('___ {}'.format(new_syms))
-        solutions = solve_poly_system(geqns)
-        for solution in solutions:
-            print('Solution:')
-            for i,v in enumerate(geqns.gens):
-                #print('$${} = {}$$'.format(new2old[v], solution[i]))
-                print('$${} = {}$$'.format(v, solution[i]))
-            
-#Equations in Groebner basis
-#$$x_{0} - 1=0$$
-#$$x_{1} + 1=0$$
-#$$x_{2} - 1=0$$
-#$$x_{3} - 3=0$$
-#$$x_{4} + 2=0$$
-#[(1, -1, 1, 3, -2)] x_{0} x_{1} x_{2} x_{3} x_{4}
-
+        self.geqns = groebner(eqns)
+        try:
+            self.gsolutions = solve_poly_system(self.geqns)
+        except:
+            self.gsolutions = 'Unable to determine solution'
 
     def create_Y(self):
         numTriples = len(self.brackets)
@@ -313,40 +324,64 @@ class LieAlgebra:
         for key1, key2 in sorted(self.brackets):
             # key1 and key2 are indices
             key3 = self.brackets[(key1, key2)].index
-            #print("{}, {}, {}, {}, {}".format(key1, key2, key3, self.d, self.dimension))
             Y[i] = I[key1-1] + I[key2-1] - I[key3-1]
             i = i + 1
-        #print(Y)
         rank = np.linalg.matrix_rank(Y)
         corank = numTriples - rank
-        #print('rank = {}, corank = {}'.format(rank, corank))
         return Y
-        """
 
-            # Doubling the bracket acts as an escape character
-            # (i.e. '{{' becomes '{' in the final output),
-            # and we need the keys to be inside of brackets
-            # before being converted to Latex
-            # so that multiple digits stick together inside of a subscript.
-            bracketFormat = latex("[X_{{{}}},X_{{{}}}]".format(key1, key2))
-            resultFormat = latex(res.alpha * Symbol("X" + str(res.index)))
-
-            print("$${} = {}$$".format(bracketFormat, resultFormat))
-            """
-    def print_jacobi_to_test(self):
-        for triple in self.JacobiToTest:
-            res = self.JacobiTestResults[triple]
-            #print("Jacobi identity for \\{{e_{}, e_{}, e_{}\\}}: $\\displaystyle {}$\\\\".format(triple, latex(res)))
-            if res == False:
-                print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: INVALID\\\\".format(triple[0], triple[1], triple[2]))
-            elif res != True:
-                print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], latex(res)))
+    def print_jacobi_tests(self, lines):
+        lines.append('\\begin{align*}')
+        for triple,eqn in self.jacobi_tests.items():
+            triple_str = '(e_{{{}}}, e_{{{}}}, e_{{{}}})'.format(
+                triple[0], triple[1], triple[2]);
+            if eqn == False:
+                lines.append("{}: & INVALID\\\\".format(triple_str))
             else:
-                print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], '0=0'))
+                lines.append("{}: & \\displaystyle {}\\\\".format(
+                    triple_str, latex(eqn)))
+        lines.append('\\end{align*}')
 
-    def add_jacobi_to_test(self, triple):
-        self.JacobiToTest.append(triple)
+        if self.gsolutions == None:
+            lines.append('There are no solutions.\\\\')
+        elif type(self.gsolutions) == str:
+            lines.append('{}.\\\\'.format(self.gsolutions))
+        else:
+            for solution in self.gsolutions:
+                lines.append('Solution:\\\\')
+                lines.append('\\begin{align*}')
+                for i,v in enumerate(self.geqns.gens):
+                    lines.append('{} &= {} \\\\'.format(
+                        latex(self.new2old[str(v)]), solution[i]))
+                
+                lines.append('\\end{align*}')
 
+    def print_groebner(self, lines):
+        eqns = self.jacobi_tests.values()
+        if len(eqns) == 0 or self.gsolutions == None:
+            return
+
+        # Show the symbol substitution
+        lines.append('Change variables\\\\')
+        for o,n in self.old2new:
+            lines.append('$${} \\rightarrow {}$$'.format(latex(o), latex(n)))
+
+        # Print the Jacobi tests
+        lines.append('Jacobi Tests\\\\')
+        for triple,eqn in self.jacobi_tests.items():
+            lines.append("Jacobi identity for {}: $${}$$".format(
+                triple, latex(eqn.subs(self.old2new))))
+
+        # Print the equations in the Groebner basis
+        lines.append('Groebner basis\\\\')
+        for geqn in self.geqns:
+            lines.append("$${}=0$$".format(latex(geqn)))
+
+        if type(self.gsolutions) != str:
+            for solution in self.gsolutions:
+                lines.append('Solution:')
+                for i,v in enumerate(self.geqns.gens):
+                    lines.append('$${} = {}$$'.format(v, solution[i]))
 
 #------------------------------------------------------------------------------
 # Functions
@@ -366,102 +401,35 @@ def test_jacobi(LA, i, j, k):
     r2 = LA.bracket(j, LA.bracket(k, i))
     r3 = LA.bracket(k, LA.bracket(i, j))
     if r1 != 0 or r2 != 0 or r3 != 0:
-        return Eq(GetEqTerm(r1) + GetEqTerm(r2) + GetEqTerm(r3))
+        ret = Eq(GetEqTerm(r1) + GetEqTerm(r2) + GetEqTerm(r3))
+        if ret == True:
+            #print('equation for {} is true: {} + {} + {}'.format(
+            #    LA, GetEqTerm(r1), GetEqTerm(r2), GetEqTerm(r3)));
+            ret = None
+        return ret
     else:
-        return False
+        return None
 
-# Find all of the non-trivial triples that need to be tested.
-def test_all_jacobi(LA):
-    if True:#LA.type == "A":
-        JacobiTestsFromY(LA)
-    else:
-        d = LA.d
-        n = LA.dimension
-        la_type = LA.type
-        #if d < (n-4)/2: Not applicable to type B
-        if True:
-            for j in range(2, n - 2):
-                for k in range(j + 1, n - 1):
-                    ej = LA.convert_index_to_eigenvalue(j, la_type)
-                    ek = LA.convert_index_to_eigenvalue(k, la_type)
-                    emax = LA.convert_index_to_eigenvalue(n, la_type)
-                    if ej + ek + 1 == emax:
-                        resultset = test_jacobi(LA, 1, j, k)
-                        if resultset is not False:
-                            LA.JacobiToTest.append((1, j, k))
-                            LA.JacobiTestResults[(1, j, k)] = resultset
-        else:
-            msg = "test\_all\_jacobi condition not met: d={} n={}. Case ignored.".format(d, n)
-            print(msg)
-
-def JacobiTestsFromY(LA):
-    Y = LA.create_Y()
-    U = np.dot(Y, Y.transpose())
-    LA.Y = Y
-    LA.U = U
-
-    # Build U graph
-    LA.G = nx.Graph()
-
-    labels = range(U.shape[0])#['a', 'b', 'c']
-    LA.G.add_nodes_from(labels)
-
-    for x,y in np.ndindex(U.shape):
-        #print(a[x,y])    
-        w = U[x,y]
-        if w != 0:
-            LA.G.add_edge(x, y, weight=w)
-        
-    # Do the rest
-    negOnes = np.where(U == -1)
-    allIndices = []
-    for i in range(len(negOnes[0])):
-        idx0 = negOnes[0][i]
-        idx1 = negOnes[1][i]
-        sum = np.add(Y[idx0], Y[idx1])
-        indices = np.where(sum == 1)
-        isIn = False
-        for i in allIndices:
-            isIn = isIn or np.array_equal(indices, i)
-        if not isIn:
-            allIndices.append(indices)
-    LA.JacobiToTest = []
-    for indices in allIndices:
-        i = indices[0][0]+1
-        j = indices[0][1]+1
-        k = indices[0][2]+1
-        resultset = test_jacobi(LA, i, j, k)
-        resultset2 = test_jacobi(LA, i, j, k)
-        if resultset is not False:
-            LA.JacobiToTest.append((i, j, k))
-            LA.JacobiTestResults[(i, j, k)] = resultset
-            LA.JacobiTestResults2[(i, j, k)] = resultset2
-
-# Convert a jacobi test result into an equation term.
-def GetEqTerm(res):
-    if type(res) == BracketResult:
-        return res.alpha
-               # * Symbol("X" + str(res.index))
+# Convert a jacobi test into an equation term.
+def GetEqTerm(eqn):
+    if type(eqn) == BracketResult:
+        return eqn.alpha
     else:
         return 0
 
 
 # Check if a 'd' value is valid for a given 'n'.
 def IsValidD(n, d):
-    #print("***** valid " + str(n) + " " + str(d))
     if n - d % 2 == 0:
-        #return (n - 2) > d
         valid = (n - 2) > d
     else:
-        #return (n - 1) > d
         valid = (n - 1) > d
-    #print("isValidD returning {}".format(valid))
     return valid
 
 
 # Accepts a lie algebra and a d value, increments the dimension, and then
 # adds the new brackets.
-def GenerateExtendedLA(LA, d, extType):
+def extend_LA(LA, d, extType):
     n = LA.dimension
     n2 = n + 1  # The dimension of the new Lie Algebras
 
@@ -469,24 +437,25 @@ def GenerateExtendedLA(LA, d, extType):
     if extType == 'B':
         LastValue = n2 + 2*d - 3
 
-    NewLieAlg = deepcopy(LA)
-    NewLieAlg.extension += 1
-    NewLieAlg.dimension += 1
-    NewLieAlg.d = d
-    NewLieAlg.type = extType
+    new_LA = deepcopy(LA)
+    new_LA.extension += 1
+    new_LA.dimension += 1
+    new_LA.d = d
+    new_LA.type = extType
+    new_LA.parent = LA
 
-    graph.add_node(NewLieAlg)
-    graph.add_edge(LA, NewLieAlg);
+    graph.add_node(new_LA)
+    graph.add_edge(LA, new_LA);
 
     if extType == 'A':
-        NewLieAlg.add_bracket(1, n, n2)
+        new_LA.add_bracket(1, n, n2)
     else:
-        NewLieAlg.add_bracket(2, n, n2)
+        new_LA.add_bracket(2, n, n2)
 
-    extension = NewLieAlg.extension
+    extension = new_LA.extension
     startValue = d
 
-    #print('from {} to {}'.format(LA, NewLieAlg))
+    #print('from {} to {}'.format(LA, new_LA))
 
     # Odd case
     if (n - d) % 2 != 0:
@@ -494,25 +463,27 @@ def GenerateExtendedLA(LA, d, extType):
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
             if i != j:
-                NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType, extension)
-
+                new_LA.add_eigenvalue_bracket(
+                    i, j, LastValue, d, n, extType, extension)
     # Even case
     else:
         CenterValue = int((LastValue - 1) / 2.0)
         for i in range(startValue, CenterValue + 1):
             j = LastValue - i
-            NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType, extension)
+            new_LA.add_eigenvalue_bracket(
+                i, j, LastValue, d, n, extType, extension)
 
-    return NewLieAlg
+    new_LA.create_jacobi_tests()
+    return new_LA
 
 
 # Accepts a lie algebra and finds the TypeB that can be made by extending it.
 def FindNextDimensionTypeB(LA):
     n = LA.dimension
     d = LA.d
-    NewLieAlg = deepcopy(LA)
-    NewLieAlg.dimension += 1
-    NewLieAlg.type = 'B'
+    new_LA = deepcopy(LA)
+    new_LA.dimension += 1
+    new_LA.type = 'B'
 
     LastValue = 2 * d + n - 2
     CenterValue = math.floor(LastValue / 2)
@@ -520,21 +491,9 @@ def FindNextDimensionTypeB(LA):
 
     for i in range(d, RangeEnd):
         j = LastValue - i
-        NewLieAlg.add_eigenvalue_bracket(i, j, LastValue, d, n, extType)
+        new_LA.add_eigenvalue_bracket(i, j, LastValue, d, n, extType)
 
-    return NewLieAlg
-
-
-def PrintFoundLieAlgebras(LAFound, filter=Filter()):
-    # If only one LA was provided there is no need to loop.
-    if type(LAFound) == LieAlgebra:
-        PrintExtendedLA(LAFound, filter)
-        #Y = LAFound.create_Y()
-        #print("Y = {}".format(Y))
-    else:
-        for LA in LAFound:
-            PrintExtendedLA(LA, filter)
-            #LA.create_Y()
+    return new_LA
 
 def null(A, eps=1e-15):
     u, s, vh = np.linalg.svd(A)
@@ -542,66 +501,66 @@ def null(A, eps=1e-15):
     null_space = scipy.compress(null_mask, vh, axis=0)
     return np.transpose(null_space)
 
-def PrintExtendedLA(LA, filter=None):
-    if filter == None or (LA.matches(filter)):
-        #print("Testing Jacobi: {}, {}".format(LA.d, LA.dimension));
-        test_all_jacobi(LA)
-        #print("Printing Jacobi: {}, {}".format(LA.d, LA.dimension));
-        sectionFormat = latex("$m_{{{}}}({}, {})$".format(str(LA.extension) + LA.type, LA.d, LA.dimension))
-        print("\section{{{}}}".format(sectionFormat))
-        LA.print_brackets()
-        print("\nNon-trivial Jacobi Tests:\n")
-        #test_all_jacobi(LA)
-        """
-        Y = LA.create_Y()
-        print("Y = \n{}".format(Y))
-        nullY = null(Y)
-        print("null(Y) = \n{}".format(nullY))
-        U = np.dot(Y, Y.transpose())
-        print("U = \n{}".format(U))
-        m = Y.shape[0]
-        print("Rank = {}, m = {}".format(np.linalg.matrix_rank(U), m))
-        print("Solving Uv = [1 1 ... 1]'")
-        ones = np.ones((m,1))
-        #print("Ones = {}".format(ones))
-        v = np.linalg.solve(U, ones)
-        print("v = \n{}".format(v))
-        """
+def Y_test(LA):
+    print('Y_test')
+    """
+    Y = LA.create_Y()
+    print("Y = \n{}".format(Y))
+    nullY = null(Y)
+    print("null(Y) = \n{}".format(nullY))
+    U = np.dot(Y, Y.transpose())
+    print("U = \n{}".format(U))
+    m = Y.shape[0]
+    print("Rank = {}, m = {}".format(np.linalg.matrix_rank(U), m))
+    print("Solving Uv = [1 1 ... 1]'")
+    ones = np.ones((m,1))
+    #print("Ones = {}".format(ones))
+    v = np.linalg.solve(U, ones)
+    print("v = \n{}".format(v))
+    """
 
-        LA.print_jacobi_to_test()
-        #print("\n")
+def print_U_matrix(LA, lines):
+    lines.append('$Y=');
+    lines.append('\\begin{bmatrix}')
+    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
+    lines.append('\\end{bmatrix}')
+    lines.append('$')
+    lines.append()
+    
+    lines.append('$U=');
+    lines.append('\\begin{bmatrix}')
+    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
+    lines.append('\\end{bmatrix}')
+    lines.append('$')
+    lines.append()
 
-        if True:#LA.type == 'A':
-            try:
-                LA.test_jacobi_groebner()
-            except:
-                print("FAILED JACOBI GROEBNER: {}".format((sys.exc_info()[1])).replace('_', '\\_'))
+    nullU = null(LA.U)
+    lines.append('$null(U)=');
+    lines.append('\\begin{bmatrix}')
+    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
+    lines.append('\\end{bmatrix}')
+    lines.append('$')
+    lines.append()
 
-        if filter.U_matrix:
-            print('$Y=');
-            print('\\begin{bmatrix}')
-            print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
-            print('\\end{bmatrix}')
-            print('$')
-            print()
 
-            print('$U=');
-            print('\\begin{bmatrix}')
-            print(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
-            print('\\end{bmatrix}')
-            print('$')
-            print()
+def print_LA(LA, verbose=False):    
+    lines = []
+    lines.append("\section*{{{}}}".format(LA.latex_repr()))
+    lines.append('{} (this line included for string searching purposes)'.format(
+        LA.simple_repr()))
+    LA.print_brackets(lines)
+    lines.append("\nNon-trivial Jacobi Tests:\n")
+    #Y_test(LA)
+    LA.print_jacobi_tests(lines)
+    LA.print_groebner(lines)
 
-            nullU = null(LA.U)
-            print('$null(U)=');
-            print('\\begin{bmatrix}')
-            print(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
-            print('\\end{bmatrix}')
-            print('$')
-            print()
+    if verbose:
+        print_U_matrix(LA, lines)
         
-        # Draw the graph
-        #draw(LA.G)
+    # Draw the graph
+    #draw(LA.G)
+
+    return '\n'.join(lines)
             
 
 # Extends a lie algebra, checking for all possible d values.
@@ -616,10 +575,10 @@ def FirstExtendLieAlgebra(LA):
     else:
         d = 3
     while IsValidD(LA.dimension, d):
-        newLA = GenerateExtendedLA(LA, d, extType='A')
+        newLA = extend_LA(LA, d, extType='A')
         NewLieList.append(newLA)
         # Generate extended type B LA from newLA
-        newLA_B = GenerateExtendedLA(newLA, newLA.d, extType='B')
+        newLA_B = extend_LA(newLA, newLA.d, extType='B')
         NewLieList.append(newLA_B)
         d += 2
     return NewLieList
@@ -631,10 +590,10 @@ def ExtendLieAlgebra(LA):
         return NewLieList
 
     d = LA.d # start d value
-    newLA = GenerateExtendedLA(LA, d, extType='A')
+    newLA = extend_LA(LA, d, extType='A')
     NewLieList.append(newLA)
     # Generate extended type B LA from newLA
-    newLA_B = GenerateExtendedLA(newLA, newLA.d, extType='B')
+    newLA_B = extend_LA(newLA, newLA.d, extType='B')
     NewLieList.append(newLA_B)
     return NewLieList
 
@@ -656,3 +615,47 @@ def ExtendL(LA, depth):
 
     return ret
     
+def print_latex(LAs):
+    lines = []
+    lines.append(
+        '\\documentclass{article}\n\\setlength{\\parindent}{0cm} ' +
+        '% Default is 15pt.')
+    lines.append('\\usepackage{amsmath}')
+    lines.append('\\setcounter{MaxMatrixCols}{30}')
+    lines.append('\\usepackage{multicol}')
+    lines.append('\\begin{document}')
+    #lines.append('\\begin{multicols}{2}')
+
+
+    lines.append('\\begin{multicols}{2}')
+    
+    n = len(LAs)
+    num_per_col = 42
+    for i in range((n//num_per_col)+1):
+        #lines.append('\\newpage')
+        lines.append('\\begin{tabular}{|l|l|c|}')
+        lines.append('\hline')
+        lines.append('{} & {} & {}\\\\'.format('search', '', 'has'))
+        lines.append('{} & {} & {}\\\\'.format('string', 'algebra', 'soln'))
+        lines.append('\hline')
+        stop = min(n, (i+1)*num_per_col)
+        for LA in LAs[i*num_per_col:stop]:
+            s = LA.gsolutions
+            sol = '' if s == None else '?' if type(s) == str else '$\\surd$'
+            lines.append('{} & {} & {} \\\\'.format(
+                LA.simple_repr(), LA.latex_repr(), sol))
+            lines.append('\hline')
+        lines.append('\\end{tabular}')
+        lines.append('\\vfill')
+        #lines.append('\\vfill\\null')
+        #lines.append('\\vspace*{\\fill}')
+        #lines.append('\\columnbreak')
+
+    lines.append('\\end{multicols}')
+
+    for LA in LAs:
+        lines.append(print_LA(LA))
+
+    #lines.append('\\end{multicols}')
+    lines.append('\n\\end{document}\n')
+    return '\n'.join(lines)
