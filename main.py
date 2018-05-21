@@ -37,7 +37,7 @@ L14 = create_L(14)
 L15 = create_L(15)
 
 Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
-#Ls = [ L4 ]
+#Ls = Ls[6:7]
 
 found = []
 for L in Ls:
@@ -61,10 +61,13 @@ print('\\begin{document}')
 found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))
 
 ## filter for beau and sara
-#filter = Filter(dimension=[6, 8, 10, 12], type='B')
-filter = Filter(dimension=range(8,15), type='B', U_matrix=False)
-#filter = Filter(dimension=[6], type='B')
-PrintFoundLieAlgebras(found, filter)
+#la_filter = Filter(dimension=[6, 8, 10, 12], type='B')
+la_filter = Filter(dimension=range(6, 10), type='B', U_matrix=False)
+#la_filter = Filter(dimension=[6], type='B')
+
+found = filter(lambda la : la.matches(la_filter), found)
+#PrintFoundLieAlgebras(found, la_filter)
+PrintFoundLieAlgebras(found)
 
 #filter = Filter(dimension=[8], type='A')
 #PrintFoundLieAlgebras(found, filter)
@@ -73,3 +76,9 @@ PrintFoundLieAlgebras(found, filter)
 #PrintFoundLieAlgebras(found, filter)
 
 print('\n\\end{document}\n')
+
+#draw_graph()
+#import networkx as nx
+#import pygraphviz
+#from networkx.drawing.nx_agraph import write_dot
+#write_dot(graph, "grid.dot")

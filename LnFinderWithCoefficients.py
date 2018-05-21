@@ -3,6 +3,7 @@ from sympy import *
 from copy import deepcopy
 import numpy as np
 import scipy
+import sys
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -70,7 +71,7 @@ def graphs_equal(G1, G2):
 
 # Utility class
 class Filter:
-    def __init__(self, d=None, dimension=None, extension=None, type=None, U_matrix=True):
+    def __init__(self, d=None, dimension=None, extension=None, type=None, U_matrix=False):
         self.d = d
         self.dimension = dimension
         self.extension = extension
@@ -99,6 +100,15 @@ class BracketResult:
         bracketcopy.alpha *= other
         return bracketcopy
 
+#------------------------------------------------------------------------------
+# Graph
+#------------------------------------------------------------------------------
+graph = nx.Graph()
+def draw_graph():
+    #nx.draw_shell(graph, with_labels=True)
+    nx.draw_networkx(graph, with_labels=True)
+    plt.show(block=True)
+    
 
 #------------------------------------------------------------------------------
 # Class LieAlgebra
@@ -223,6 +233,14 @@ class LieAlgebra:
     def test_jacobi_groebner(self):
         # print before substitution
         eqns = [self.JacobiTestResults[triple] for triple in self.JacobiToTest]
+        eqns = list(filter(lambda eqn : eqn != True, eqns))
+        if len(eqns) == 0:
+            print('No Groebner equations.')
+            return
+        for eqn in eqns:
+            if eqn == False:
+                print('NO GROEBNER BASIS')
+                return
 
         syms = []
         for eqn in eqns:
@@ -233,6 +251,7 @@ class LieAlgebra:
         new_syms = ['x_{{{}}}'.format(i) for i in range(n)]
         #print(new_syms)
         old2new = list(zip(syms, new_syms))
+        #new2old = dict(zip(new_syms, syms))
         #print("Symbol map: {}".format(['$({}, {})$'.format(latex(o), latex(n)) for o,n in old2new]))
         for o,n in old2new:
             print('$${} \\rightarrow {}$$'.format(latex(o), latex(n)))
@@ -244,10 +263,9 @@ class LieAlgebra:
 
         for triple in self.JacobiToTest:
             eqn = self.JacobiTestResults[triple]
-            #if latex(eqn) == 'True':
-            #print('$${}$$'.format(eqn))
-            #if '{}'.format(eqn) == 'True':
-            if eqn != True:
+            if eqn == False:
+                print("Jacobi identity for {}: INVALID".format(triple))
+            elif eqn != True:
                 print("Jacobi identity for {}: $$\\displaystyle {}$$ $${}$$".format(triple, latex(eqn), latex(eqn.subs(old2new))))
 
         print()
@@ -264,8 +282,28 @@ class LieAlgebra:
         print("Equations in Groebner basis")
         geqns = groebner(eqns)
         for geqn in geqns:
-            print("$${}$$".format(latex(geqn)))
+            print("$${}=0$$".format(latex(geqn)))
             #print("$${}$$".format(r))
+        #print(solve_poly_system(geqns, *new_syms))
+        #print('gens = ___ {}'.format(geqns.gens))
+        #print('args = ___ {}'.format(geqns.args))
+        #print('domain = ___ {}'.format(geqns.domain))
+        #print('___ {}'.format(new_syms))
+        solutions = solve_poly_system(geqns)
+        for solution in solutions:
+            print('Solution:')
+            for i,v in enumerate(geqns.gens):
+                #print('$${} = {}$$'.format(new2old[v], solution[i]))
+                print('$${} = {}$$'.format(v, solution[i]))
+            
+#Equations in Groebner basis
+#$$x_{0} - 1=0$$
+#$$x_{1} + 1=0$$
+#$$x_{2} - 1=0$$
+#$$x_{3} - 3=0$$
+#$$x_{4} + 2=0$$
+#[(1, -1, 1, 3, -2)] x_{0} x_{1} x_{2} x_{3} x_{4}
+
 
     def create_Y(self):
         numTriples = len(self.brackets)
@@ -299,7 +337,9 @@ class LieAlgebra:
         for triple in self.JacobiToTest:
             res = self.JacobiTestResults[triple]
             #print("Jacobi identity for \\{{e_{}, e_{}, e_{}\\}}: $\\displaystyle {}$\\\\".format(triple, latex(res)))
-            if res != True:
+            if res == False:
+                print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: INVALID\\\\".format(triple[0], triple[1], triple[2]))
+            elif res != True:
                 print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], latex(res)))
             else:
                 print("\\strut \\qquad Jacobi identity for $\\{{e_{}, e_{}, e_{}\\}}$: $\\displaystyle {}$\\\\".format(triple[0], triple[1], triple[2], '0=0'))
@@ -434,6 +474,10 @@ def GenerateExtendedLA(LA, d, extType):
     NewLieAlg.dimension += 1
     NewLieAlg.d = d
     NewLieAlg.type = extType
+
+    graph.add_node(NewLieAlg)
+    graph.add_edge(LA, NewLieAlg);
+
     if extType == 'A':
         NewLieAlg.add_bracket(1, n, n2)
     else:
@@ -481,7 +525,7 @@ def FindNextDimensionTypeB(LA):
     return NewLieAlg
 
 
-def PrintFoundLieAlgebras(LAFound, filter=None):
+def PrintFoundLieAlgebras(LAFound, filter=Filter()):
     # If only one LA was provided there is no need to loop.
     if type(LAFound) == LieAlgebra:
         PrintExtendedLA(LAFound, filter)
@@ -531,7 +575,7 @@ def PrintExtendedLA(LA, filter=None):
             try:
                 LA.test_jacobi_groebner()
             except:
-                print("****** FAILED JACOBI GROEBNER ******")
+                print("FAILED JACOBI GROEBNER: {}".format((sys.exc_info()[1])).replace('_', '\\_'))
 
         if filter.U_matrix:
             print('$Y=');
