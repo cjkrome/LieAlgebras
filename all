@@ -1,17 +1,35 @@
 #! /bin/bash
 
-#python main.py > test.tex
-python main.py
+python LnFinderWithCoefficients.py
+
+# Typeset output
 if [ $? -eq 0 ]; then
-  pdflatex test
-fi
-if [ $? -eq 0 ]; then
-  open test.pdf
+  echo "Lie succeeded"
+  pdflatex test >/dev/null 2>&1
+else
+  echo "Lie failed"
+  exit
 fi
 
+# Open output
 if [ $? -eq 0 ]; then
-  dot -Tpdf grid.dot -o grid.pdf
+  echo "Latex succeeded"
+  open test.pdf
+else
+  echo "Latex failed"
+  exit
 fi
+
+# Build graph
 if [ $? -eq 0 ]; then
+  dot -Tpdf grid.dot -o grid.pdf >/dev/null 2>&1
+fi
+
+# Open graph
+if [ $? -eq 0 ]; then
+  echo "Dot succeeded"
   open grid.pdf
+else
+  echo "Dot failed"
+  exit
 fi
