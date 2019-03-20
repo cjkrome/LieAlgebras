@@ -1,3 +1,3 @@
 # LieAlgebras
 
-To run everything, use the ```all``` script. To change parameters, change main.py.
+To run everything, use the ```all``` script. To change parameters, change the main function in lie.py.
