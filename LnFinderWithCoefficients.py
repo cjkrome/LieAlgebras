@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 import scipy
 import sys
+import sympy.polys.polyerrors
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -84,9 +85,9 @@ class Filter:
 
 # Object for holding the result of a bracket operation.
 # Constructor parameters:
-#   1. k - the X index of the result.
+#   1. k - the e index of the result.
 #   2. alpha - the alpha value for the result (may be a number or Sympy symbol).
-# Example: Given the bracket [X1, X2] = X3, the bracket result object would be:
+# Example: Given the bracket [e_1, e_2] = e_3, the bracket result object would be:
 #   k = 3, alpha = 1
 class BracketResult:
     def __init__(self, k, alpha):
@@ -149,7 +150,9 @@ class LieAlgebra:
             str(self.extension), self.type, self.d, self.dimension))
 
     def latex_repr(self):
-        return latex("$m_{{{}}}({}, {})$".format(
+        #return latex("$m_{{{}}}({}, {})$".format(
+        #    str(self.extension) + self.type, self.d, self.dimension))
+        return latex("$\\frakm_{{{}}}({}, {})$".format(
             str(self.extension) + self.type, self.d, self.dimension))
 
     # f = filter
@@ -181,12 +184,14 @@ class LieAlgebra:
             self.add_bracket(i, j, k)
         elif extType == 'A' and ext == 1:
             self.add_bracket(i, j, k, (-1)**i)
+        elif extType == 'A' and ext == 2:
+            self.add_bracket(i, j, k, ((-1)**i)*(((n-d+3)//2)-i))
         else:
             # This format ensures correct Latex printing:
             alphatext = "alpha_{},{}^{}".format(i, j, k)
             self.add_bracket(i, j, k, Symbol(alphatext))
 
-    # Performs the bracket operation [Xi, Xj]
+    # Performs the bracket operation [e_i, e_j]
     def bracket(self, i, j):
         newAlpha = 1
 
@@ -199,7 +204,7 @@ class LieAlgebra:
 
         if (i, j) in self.brackets:
             return self.brackets[(i, j)] * newAlpha
-        # If [Xi, Xj] is not found, check for [Xj, Xi] (and multiply the
+        # If [e_i, e_j] is not found, check for [e_j, e_i] (and multiply the
         # resulting alpha by -1 if found).
         elif (j, i) in self.brackets:
             return self.brackets[(j, i)] * (newAlpha * -1)
@@ -226,8 +231,31 @@ class LieAlgebra:
                 return eigenval - d + 2
             return n+1
         
-    def print_brackets(self, lines):
+    def print_soln_brackets(self, lines):
+        lines.append("\\\\")
+        for i,a2s in enumerate(self.alpha2soln):
+            lines.append("Solution {}".format(i+1))
+            lines.append('\\begin{align*}')
+            i = 0
+            for key1, key2 in sorted(self.brackets):
+                res = self.brackets[(key1, key2)]
+
+                bracket = latex("[e_{{{}}},e_{{{}}}]".format(key1, key2))
+                if res.alpha in a2s:
+                    result = latex(a2s[res.alpha] * Symbol("e" + str(res.index)))
+                else:
+                    result = latex(res.alpha * Symbol("e" + str(res.index)))
+
+                if i % 2 == 0:
+                    lines.append("{} &= {} &".format(bracket, result))
+                else:
+                    lines.append("{} &= {} \\\\".format(bracket, result))
+                i += 1
+            lines.append('\\end{align*}')
+
+    def print_orig_brackets(self, lines):
         lines.append('\\begin{align*}')
+        i = 0
         for key1, key2 in sorted(self.brackets):
             res = self.brackets[(key1, key2)]
 
@@ -236,16 +264,20 @@ class LieAlgebra:
             # and we need the keys to be inside of brackets
             # before being converted to Latex
             # so that multiple digits stick together inside of a subscript.
-            bracketFormat = latex("[X_{{{}}},X_{{{}}}]".format(key1, key2))
-            resultFormat = latex(res.alpha * Symbol("X" + str(res.index)))
-
-            #lines.append("$${} = {}$$".format(bracketFormat, resultFormat))
-            lines.append("{} &= {} \\\\".format(bracketFormat, resultFormat))
+            bracket = latex("[e_{{{}}},e_{{{}}}]".format(key1, key2))
+            result = latex(res.alpha * Symbol("e" + str(res.index)))
+            if i % 2 == 0:
+                lines.append("{} &= {} &".format(bracket, result))
+            else:
+                lines.append("{} &= {} \\\\".format(bracket, result))
+            i += 1
         lines.append('\\end{align*}')
 
 
     # Find all of the non-trivial triples that need to be tested.
     def create_jacobi_tests(self):
+        self.alpha2soln = []
+
         Y = self.create_Y()
         U = np.dot(Y, Y.transpose())
         self.Y = Y
@@ -313,8 +345,39 @@ class LieAlgebra:
         self.geqns = groebner(eqns)
         try:
             self.gsolutions = solve_poly_system(self.geqns)
-        except:
-            self.gsolutions = 'Unable to determine solution'
+            for solution in self.gsolutions:
+                a2s = {}
+                for i,v in enumerate(self.geqns.gens):
+                    a2s[self.new2old[str(v)]] = solution[i]
+                self.alpha2soln.append(a2s)
+
+        #except Exception as e:
+        except NotImplementedError as e:
+            self.gsolutions = 'Infinite number of solutions'
+            #print('Infinite number of solutions: {}: {} {}'.format(self, type(e), e))
+
+            #print(self.geqns)
+            #for e in self.geqns:
+            #    print(type(e))
+                #print(e.args)
+                #try:
+                #    if not e.is_number():
+                #        print(degree(e.as_poly()))
+                #    else:
+                #        print('is number: {}'.format(''))
+                #except Exception as e:
+                #    print('exception: {}'.format(e))
+        except sympy.polys.polyerrors.ComputationFailed as e:
+            self.gsolutions = 'No solutions'
+            #print('No solutions: {} {}'.format(type(e), e))
+            #print('No solutions: {}'.format(e))
+            
+
+    def jacobi_tests_consistent(self):
+        return self.gsolutions != None
+
+    def has_solution(self):
+        return self.gsolutions != None and type(self.gsolutions) != str
 
     def create_Y(self):
         numTriples = len(self.brackets)
@@ -350,8 +413,8 @@ class LieAlgebra:
         elif type(self.gsolutions) == str:
             lines.append('{}.\\\\'.format(self.gsolutions))
         else:
-            for solution in self.gsolutions:
-                lines.append('Solution:\\\\')
+            for i,solution in enumerate(self.gsolutions):
+                lines.append('Solution {}:\\\\'.format(i+1))
                 lines.append('\\begin{align*}')
                 for i,v in enumerate(self.geqns.gens):
                     lines.append('{} &= {} \\\\'.format(
@@ -365,7 +428,7 @@ class LieAlgebra:
             return
 
         # Show the symbol substitution
-        lines.append('\\textit{How the solution was or was not found:}\\\\')
+        lines.append('\\textit{How the solution(s) were or were not found:}\\\\')
         lines.append('Change variables\\\\')
         for o,n in self.old2new:
             lines.append('$${} \\rightarrow {}$$'.format(latex(o), latex(n)))
@@ -385,8 +448,8 @@ class LieAlgebra:
             lines.append("$${}=0$$".format(latex(geqn)))
 
         if type(self.gsolutions) != str:
-            for solution in self.gsolutions:
-                lines.append('Solution:')
+            for i,solution in enumerate(self.gsolutions):
+                lines.append('Solution {}:'.format(i+1))
                 for i,v in enumerate(self.geqns.gens):
                     lines.append('$${} = {}$$'.format(v, solution[i]))
 
@@ -560,7 +623,9 @@ def print_LA(LA, verbose=False):
     lines.append("\section*{{{}}}".format(LA.latex_repr()))
     lines.append('{} (this line included for string searching purposes)'.format(
         LA.simple_repr()))
-    LA.print_brackets(lines)
+    LA.print_soln_brackets(lines)
+    lines.append("\nOriginal brackets:\n")
+    LA.print_orig_brackets(lines)
     lines.append("\nNon-trivial Jacobi Tests:\n")
     #Y_test(LA)
     LA.print_jacobi_tests(lines)
@@ -644,11 +709,14 @@ def print_latex(LAs):
         '\\documentclass{article}\n\\setlength{\\parindent}{0cm} ' +
         '% Default is 15pt.')
     lines.append('\\usepackage{amsmath}')
+    lines.append('\\usepackage{amsfonts}')
+
+    lines.append('\\newcommand{\\frakm}{\\ensuremath{\\mathfrak{m}} }')
+
     lines.append('\\setcounter{MaxMatrixCols}{30}')
     lines.append('\\usepackage{multicol}')
     lines.append('\\begin{document}')
     #lines.append('\\begin{multicols}{2}')
-
 
     lines.append('\\begin{multicols}{2}')
     
@@ -656,17 +724,31 @@ def print_latex(LAs):
     num_per_col = 42
     for i in range((n//num_per_col)+1):
         #lines.append('\\newpage')
-        lines.append('\\begin{tabular}{|l|l|c|}')
+        lines.append('\\begin{tabular}{|l|l|c|c|}')
         lines.append('\hline')
-        lines.append('{} & {} & {}\\\\'.format('search', '', 'has'))
-        lines.append('{} & {} & {}\\\\'.format('string', 'algebra', 'soln'))
+        #lines.append('{} & {} & {} & {} & {}\\\\'.format(
+        #    'search', 'algebra', 'Jac', 'lin', 'sol'))
+        lines.append('{} & {} & {} & {}\\\\'.format(
+            'search', 'algebra', 'Jac', 'sol'))
         lines.append('\hline')
         stop = min(n, (i+1)*num_per_col)
         for LA in LAs[i*num_per_col:stop]:
             s = LA.gsolutions
-            sol = '' if s == None else '?' if type(s) == str else '$\\surd$'
-            lines.append('\\tiny{{{}}} & {} & {} \\\\'.format(
-                LA.simple_repr(), LA.latex_repr(), sol))
+            if s == None:
+                sol = ''
+            elif s == 'No solutions':
+                sol = '0'
+            elif s == 'Infinite number of solutions':
+                sol = '$\infty$'
+            else:
+                sol = str(max([1, len(LA.gsolutions)]))
+            jac = '$\\surd$' if LA.jacobi_tests_consistent() else '-'
+            if not LA.jacobi_tests_consistent():
+                lines.append('\\tiny{{{}}} & {}  & {}  & {} \\\\'.format(
+                    LA.simple_repr(), LA.latex_repr(), jac, '-'))
+            else:
+                lines.append('\\tiny{{{}}} & {} & {}  & {} \\\\'.format(
+                    LA.simple_repr(), LA.latex_repr(), jac, sol))
             lines.append('\hline')
         lines.append('\\end{tabular}')
         lines.append('\\vfill')
@@ -675,6 +757,10 @@ def print_latex(LAs):
         #lines.append('\\columnbreak')
 
     lines.append('\\end{multicols}')
+
+    lines.append('Jac = Jacobi tests are consistent\\\\')
+    lines.append('lin = Equations in Groebner basis are linear\\\\')
+    lines.append('sol = Found solution\\\\')
 
     for LA in LAs:
         lines.append(print_LA(LA))
