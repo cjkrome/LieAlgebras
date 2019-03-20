@@ -1,0 +1,11 @@
+.DS_Store
+.cache/
+.ipynb_checkpoints/
+bak
+*.aux
+*.dvi
+*.log
+*.pdf
+*.tex
+__pycache__
+*.dot

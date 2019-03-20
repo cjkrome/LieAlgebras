@@ -18,10 +18,10 @@ L13 = create_L(13)
 L14 = create_L(14)
 L15 = create_L(15)
 
-Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
+Ls = [ L4, L5, L6 ]#, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
 
 found = []
-max_dim = 14
+max_dim = 10
 for L in Ls:
     if L.dimension < max_dim:
         found.extend(ExtendL(LA=L, depth=max_dim-L.dimension))
@@ -33,7 +33,7 @@ found.sort(key=lambda la: (la.type, la.dimension, la.d, la.extension))
 
 #la_filter = Filter(dimension=[6, 8, 10, 12], type='B')
 #la_filter = Filter(dimension=range(6, 10), type='B', U_matrix=False)
-la_filter = Filter()
+la_filter = Filter() # Everything
 
 found = list(filter(lambda la : la.matches(la_filter), found))
 

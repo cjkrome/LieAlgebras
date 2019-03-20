@@ -1,0 +1,17 @@
+#! /bin/bash
+
+#python main.py > test.tex
+python main.py
+if [ $? -eq 0 ]; then
+  pdflatex test
+fi
+if [ $? -eq 0 ]; then
+  open test.pdf
+fi
+
+if [ $? -eq 0 ]; then
+  dot -Tpdf grid.dot -o grid.pdf
+fi
+if [ $? -eq 0 ]; then
+  open grid.pdf
+fi
