@@ -1,11 +1,13 @@
 #! /bin/bash
 
-python LnFinderWithCoefficients.py
+python lie.py
+
+cd output
 
 # Typeset output
 if [ $? -eq 0 ]; then
   echo "Lie succeeded"
-  pdflatex test >/dev/null 2>&1
+  pdflatex output >/dev/null 2>&1
 else
   echo "Lie failed"
   exit
@@ -14,7 +16,7 @@ fi
 # Open output
 if [ $? -eq 0 ]; then
   echo "Latex succeeded"
-  open test.pdf
+  open output.pdf
 else
   echo "Latex failed"
   exit

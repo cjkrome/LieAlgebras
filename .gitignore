@@ -9,3 +9,4 @@ bak
 *.tex
 __pycache__
 *.dot
+output

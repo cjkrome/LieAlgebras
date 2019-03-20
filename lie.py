@@ -787,7 +787,7 @@ def __main__():
     Ls = [ L4, L5, L6 ]#, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
 
     found = []
-    max_dim = 10
+    max_dim = 6
     for L in Ls:
         if L.dimension < max_dim:
             found.extend(ExtendL(LA=L, depth=max_dim-L.dimension))
@@ -802,11 +802,11 @@ def __main__():
 
     found = list(filter(lambda la : la.matches(la_filter), found))
 
-    f = open('test.tex', 'w')
+    f = open('output/output.tex', 'w')
     f.write(print_latex(found))
     f.close()
 
-    f = open('grid.dot', 'w') 
+    f = open('output/grid.dot', 'w') 
     f.write('digraph G {\n')
     for la in found:
         if la.parent:
