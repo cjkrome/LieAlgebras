@@ -7,7 +7,7 @@ cd output
 # Typeset output
 if [ $? -eq 0 ]; then
   echo "Lie succeeded"
-  pdflatex output >/dev/null 2>&1
+  pdflatex -interaction=nonstopmode output >/dev/null 2>&1
 else
   echo "Lie failed"
   exit
@@ -30,7 +30,7 @@ fi
 # Open graph
 if [ $? -eq 0 ]; then
   echo "Dot succeeded"
-  open grid.pdf
+  #open grid.pdf
 else
   echo "Dot failed"
   exit

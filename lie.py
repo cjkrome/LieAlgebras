@@ -5,6 +5,7 @@ import numpy as np
 import scipy
 import sys
 import sympy.polys.polyerrors
+from functools import reduce
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -183,8 +184,10 @@ class LieAlgebra:
         if extType == 'B' and i == 2:
             self.add_bracket(i, j, k)
         elif extType == 'A' and ext == 1:
+            # 1st extension variable reduction hack (proposition 5.1)
             self.add_bracket(i, j, k, (-1)**i)
         elif extType == 'A' and ext == 2:
+            # 2nd extension variable reduction hack (proposition 5.2)
             self.add_bracket(i, j, k, ((-1)**i)*(((n-d+3)//2)-i))
         else:
             # This format ensures correct Latex printing:
@@ -295,8 +298,11 @@ class LieAlgebra:
                 self.G.add_edge(x, y, weight=w)
             
         # Do the rest
+
+        # First array of negOnes are the rows? and the second array are the columns?
         negOnes = np.where(U == -1)
         allIndices = []
+        # len(negOnes[0]) is the number of negative ones in U
         for i in range(len(negOnes[0])):
             idx0 = negOnes[0][i]
             idx1 = negOnes[1][i]
@@ -353,7 +359,7 @@ class LieAlgebra:
 
         #except Exception as e:
         except NotImplementedError as e:
-            self.gsolutions = 'Infinite number of solutions'
+            self.gsolutions = 'Infinite number of solutions: {}'.format(e)
             #print('Infinite number of solutions: {}: {} {}'.format(self, type(e), e))
 
             #print(self.geqns)
@@ -443,7 +449,11 @@ class LieAlgebra:
         #        triple, latex(eqn.subs(self.old2new))))
 
         # Print the equations in the Groebner basis
-        lines.append('Groebner basis\\\\')
+        polys = self.geqns.polys
+        num_linear = reduce((lambda x, y: x + y), [1 if poly.is_linear else 0 for poly in polys])
+        num_nonlinear = len(polys) - num_linear
+        lines.append('Groebner basis ({} variables, {} linear, {} nonlinear)\\\\'.
+                     format(len(self.geqns.gens), num_linear, num_nonlinear))
         for geqn in self.geqns:
             lines.append("$${}=0$$".format(latex(geqn)))
 
@@ -490,8 +500,13 @@ def GetEqTerm(eqn):
 
 # Check if a 'd' value is valid for a given 'n'.
 def IsValidD(n, d):
+    # This if statement always evaluates to true.
     if n - d % 2 == 0:
+        # This code is probably never exercised. The difference between n and d
+        # is always even.
+        print('This is a big surprise')
         valid = (n - 2) > d
+        print('isvalid {} {} valid = {}'.format(n, d, valid))
     else:
         valid = (n - 1) > d
     return valid
@@ -594,28 +609,33 @@ def Y_test(LA):
     print("v = \n{}".format(v))
     """
 
+def mystr(x):
+    return '{:.0f}'.format(x)
+
 def print_U_matrix(LA, lines):
     lines.append('$Y=');
     lines.append('\\begin{bmatrix}')
-    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
+    #lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.Y]))
+    lines.append(" \\\\\n".join([" & ".join(map(mystr,line)) for line in LA.Y]))
     lines.append('\\end{bmatrix}')
     lines.append('$')
-    lines.append()
+    lines.append('')
     
     lines.append('$U=');
     lines.append('\\begin{bmatrix}')
-    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
+#    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in LA.U]))
+    lines.append(" \\\\\n".join([" & ".join(map(mystr,line)) for line in LA.U]))
     lines.append('\\end{bmatrix}')
     lines.append('$')
-    lines.append()
+    lines.append('')
 
-    nullU = null(LA.U)
-    lines.append('$null(U)=');
-    lines.append('\\begin{bmatrix}')
-    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
-    lines.append('\\end{bmatrix}')
-    lines.append('$')
-    lines.append()
+#    nullU = null(LA.U)
+#    lines.append('$null(U)=');
+#    lines.append('\\begin{bmatrix}')
+#    lines.append(" \\\\\n".join([" & ".join(map(str,line)) for line in nullU]))
+#    lines.append('\\end{bmatrix}')
+#    lines.append('$')
+#    lines.append('')
 
 
 def print_LA(LA, verbose=False):    
@@ -763,7 +783,8 @@ def print_latex(LAs):
     lines.append('sol = Found solution\\\\')
 
     for LA in LAs:
-        lines.append(print_LA(LA))
+        verbose = False
+        lines.append(print_LA(LA, verbose))
 
     #lines.append('\\end{multicols}')
     lines.append('\n\\end{document}\n')
@@ -784,10 +805,16 @@ def __main__():
     L14 = create_L(14)
     L15 = create_L(15)
 
-    Ls = [ L4, L5, L6 ]#, L7, L8, L9, L10, L11, L12, L13, L14, L15 ]
+    Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13 ]#, L14, L15 ]
 
     found = []
-    max_dim = 6
+    max_dim = 14
+
+    just_one = False
+    if (just_one):
+        Ls = [ L6, L7, L8 ]
+        max_dim = 14
+
     for L in Ls:
         if L.dimension < max_dim:
             found.extend(ExtendL(LA=L, depth=max_dim-L.dimension))
