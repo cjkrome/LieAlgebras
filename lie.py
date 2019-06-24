@@ -497,61 +497,6 @@ def GetEqTerm(eqn):
     else:
         return 0
 
-# Accepts a lie algebra and a d value, increments the dimension, and then
-# adds the new brackets.
-def extend_LA(LA, d, extType):
-    n = LA.dimension
-    n2 = n + 1  # The dimension of the new Lie Algebras
-
-    LastValue = n + d - 1  # The last eigenvalue
-    if extType == 'B':
-        LastValue = n2 + 2*d - 3
-
-    try:
-        new_LA = deepcopy(LA)
-    except:
-        print('Failed to extend {}: failure in deep copy'.format(LA))
-        raise
-
-    new_LA.extension += 1
-    new_LA.dimension += 1
-    new_LA.d = d
-    new_LA.type = extType
-    new_LA.parent = LA
-
-    graph.add_node(new_LA)
-    graph.add_edge(LA, new_LA);
-
-    if extType == 'A':
-        new_LA.add_bracket(1, n, n2)
-    else:
-        new_LA.add_bracket(2, n, n2)
-
-    extension = new_LA.extension
-    startValue = d
-
-    #print('from {} to {}'.format(LA, new_LA))
-
-    # Odd case
-    if (n - d) % 2 != 0:
-        CenterValue = int(LastValue / 2)
-        for i in range(startValue, CenterValue + 1):
-            j = LastValue - i
-            if i != j:
-                new_LA.add_eigenvalue_bracket(
-                    i, j, LastValue, d, n, extType, extension)
-    # Even case
-    else:
-        CenterValue = int((LastValue - 1) / 2.0)
-        for i in range(startValue, CenterValue + 1):
-            j = LastValue - i
-            new_LA.add_eigenvalue_bracket(
-                i, j, LastValue, d, n, extType, extension)
-
-    new_LA.create_jacobi_tests()
-    return new_LA
-
-
 # Accepts a lie algebra and finds the TypeB that can be made by extending it.
 def FindNextDimensionTypeB(LA):
     n = LA.dimension
@@ -644,42 +589,94 @@ def print_LA(LA, verbose=False):
 
     return '\n'.join(lines)
             
-# Extends a lie algebra using the d value of LA.
-def ExtendLA(LA):
-    extensions = []
-    if LA.type == 'B':
-        return extensions
+# Accepts a lie algebra and a d value, increments the dimension, and then
+# adds the new brackets.
+def extend_LA(LA, d, extType):
+    n = LA.dimension
+    n2 = n + 1  # The dimension of the new Lie Algebras
 
-    d = LA.d # start d value
+    LastValue = n + d - 1  # The last eigenvalue
+    if extType == 'B':
+        LastValue = n2 + 2*d - 3
+
     try:
-        extension = extend_LA(LA, d, extType='A')
+        new_LA = deepcopy(LA)
+    except:
+        print('Failed to extend {}: failure in deep copy'.format(LA))
+        raise
+
+    new_LA.extension += 1
+    new_LA.dimension += 1
+    new_LA.d = d
+    new_LA.type = extType
+    new_LA.parent = LA
+
+    graph.add_node(new_LA)
+    graph.add_edge(LA, new_LA);
+
+    if extType == 'A':
+        new_LA.add_bracket(1, n, n2)
+    else:
+        new_LA.add_bracket(2, n, n2)
+
+    extension = new_LA.extension
+    startValue = d
+
+    #print('from {} to {}'.format(LA, new_LA))
+
+    # Odd case
+    if (n - d) % 2 != 0:
+        CenterValue = int(LastValue / 2)
+        for i in range(startValue, CenterValue + 1):
+            j = LastValue - i
+            if i != j:
+                new_LA.add_eigenvalue_bracket(
+                    i, j, LastValue, d, n, extType, extension)
+    # Even case
+    else:
+        CenterValue = int((LastValue - 1) / 2.0)
+        for i in range(startValue, CenterValue + 1):
+            j = LastValue - i
+            new_LA.add_eigenvalue_bracket(
+                i, j, LastValue, d, n, extType, extension)
+
+    new_LA.create_jacobi_tests()
+    return new_LA
+
+def recursiveExtension(LA, depth):
+    # Reached our maximum depth
+    if depth < 1:
+        return []
+    # Can't extend type B
+    if LA.type == 'B':
+        return []
+
+    extensions = []
+    # Take type A extension
+    try:
+        extension = extend_LA(LA, LA.d, extType='A')
         extensions.append(extension)
+        # Make recursive call
+        extensions.extend(recursiveExtension(extension, depth-1))
     except:
         print('Failed A extension of {}'.format(LA))
 
-    # Generate extended type B LA from extension
+    # Take type B extension if it exists
     if LA.dimension % 2 == 1:
         try:
-            extension_B = extend_LA(LA, LA.d, extType='B')
-            extensions.append(extension_B)
+            extension = extend_LA(LA, LA.d, extType='B')
+            extensions.append(extension)
+            # No recursive call for type B -- they can't be extended
         except:
             print('Failed B extension of {}'.format(LA))
 
     return extensions
 
-def recursiveExtension(LA, depth):
-    ret = []
-    if depth > 0:
-        extensions = ExtendLA(LA)
-        ret.extend(extensions)
-        for newLA in extensions:
-            ret.extend(recursiveExtension(newLA, depth - 1))
-    return ret
 
-# This extends an L algebra (our starting point). Find all the one-fold
+# This extends a standard (L) algebra. Find all the one-fold
 # extensions for different d values then recursively find remaining
 # extensions up to depth.
-def extendL(LA, depth):
+def extendStandard(LA, depth):
     one_extensions = []
 
     # Check for every d from 2/3 (for n is even/odd, resp.) to n-2. For every d,
@@ -811,7 +808,7 @@ def __main__():
     for L in Ls:
         if L.dimension < max_dim:
             print('Extending {}'.format(L.simple_repr()))
-            found.extend(extendL(LA=L, depth=max_dim-L.dimension))
+            found.extend(extendStandard(LA=L, depth=max_dim-L.dimension))
 
     # sort algebras in order of dimension and output
     #found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))
