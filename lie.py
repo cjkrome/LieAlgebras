@@ -644,26 +644,8 @@ def print_LA(LA, verbose=False):
 
     return '\n'.join(lines)
             
-
-# Extends a lie algebra, checking for all possible d values.
-# This function is iterative (no recursion).
-def FirstExtendLieAlgebra(LA):
-    extensions = []
-
-    # Check for every d from 2/3 (for n is even/odd, resp.) to n-2.
-    n = LA.dimension
-    for d in range(2+(n%2), n-1, 2):
-        extension = extend_LA(LA, d, extType='A')
-        extensions.append(extension)
-        # Generate extended type B LA from extension
-        if extension.dimension % 2 == 1:
-            extension_B = extend_LA(extension, extension.d, extType='B')
-            extensions.append(extension_B)
-        d += 2
-    return extensions
-
 # Extends a lie algebra using the d value of LA.
-def ExtendLieAlgebra(LA):
+def ExtendLA(LA):
     extensions = []
     if LA.type == 'B':
         return extensions
@@ -686,23 +668,41 @@ def ExtendLieAlgebra(LA):
 
     return extensions
 
-def RecursiveExtension(LA, depth):
+def recursiveExtension(LA, depth):
     ret = []
     if depth > 0:
-        LAFound = ExtendLieAlgebra(LA)
-        ret.extend(LAFound)
-        for NewLA in LAFound:
-            ret.extend(RecursiveExtension(NewLA, depth - 1))
+        extensions = ExtendLA(LA)
+        ret.extend(extensions)
+        for newLA in extensions:
+            ret.extend(recursiveExtension(newLA, depth - 1))
     return ret
 
-def ExtendL(LA, depth):
-    ret = []
-    LAFound = FirstExtendLieAlgebra(LA)
-    ret.extend(LAFound)
-    for NewLA in LAFound:
-        ret.extend(RecursiveExtension(NewLA, depth - 1))
+# This extends an L algebra (our starting point). Find all the one-fold
+# extensions for different d values then recursively find remaining
+# extensions up to depth.
+def extendL(LA, depth):
+    one_extensions = []
 
-    return ret
+    # Check for every d from 2/3 (for n is even/odd, resp.) to n-2. For every d,
+    # take an A extension and then a B extension if it exists.
+    n = LA.dimension
+    for d in range(2+(n%2), n-1, 2):
+        one_extension = extend_LA(LA, d, extType='A')
+        one_extensions.append(one_extension)
+        # Generate extended type B LA from extension if exists
+        if one_extension.dimension % 2 == 1:
+            one_extension_B = extend_LA(one_extension, one_extension.d, extType='B')
+            one_extensions.append(one_extension_B)
+        d += 2
+
+    extensions = []
+    extensions.extend(one_extensions)
+
+    # Recursively find all extensions from the first extensions
+    for one_extension in one_extensions:
+        extensions.extend(recursiveExtension(one_extension, depth - 1))
+
+    return extensions
     
 def print_latex(LAs):
     lines = []
@@ -821,7 +821,7 @@ def __main__():
     for L in Ls:
         if L.dimension < max_dim:
             print('Extending {}'.format(L.simple_repr()))
-            found.extend(ExtendL(LA=L, depth=max_dim-L.dimension))
+            found.extend(extendL(LA=L, depth=max_dim-L.dimension))
 
     # sort algebras in order of dimension and output
     #found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))

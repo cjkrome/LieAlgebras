@@ -16,7 +16,7 @@ fi
 # Open output
 if [ $? -eq 0 ]; then
   echo "Latex succeeded"
-  open output.pdf
+#  open output.pdf
 else
   echo "Latex failed"
   exit
@@ -35,3 +35,5 @@ else
   echo "Dot failed"
   exit
 fi
+
+diff -s output.csv output-gold.csv
