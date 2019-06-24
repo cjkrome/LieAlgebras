@@ -623,10 +623,8 @@ def extendLA(LA, d, extType):
     new_LA.create_jacobi_tests()
     return new_LA
 
-#def extendRecursively(LA, depth):
 def extendRecursively(LA, maxDimension):
     # Reached our maximum depth
-#    if depth < 1:
     if LA.dimension == maxDimension:
         return []
     # Can't extend type B
@@ -639,7 +637,6 @@ def extendRecursively(LA, maxDimension):
         extension = extendLA(LA, LA.d, extType='A')
         extensions.append(extension)
         # Make recursive call
-#        extensions.extend(extendRecursively(extension, depth-1))
         extensions.extend(extendRecursively(extension, maxDimension))
     except:
         print('Failed A extension of {}'.format(LA))
@@ -659,25 +656,18 @@ def extendRecursively(LA, maxDimension):
 # This extends a standard (L) algebra. Find all the one-fold
 # extensions for different d values then recursively find remaining
 # extensions up to depth.
-#def extendStandard(LA, depth):
 def extendStandard(LA, maxDimension):
-    one_extensions = []
+    extensions = []
 
     # Check for every d from 2/3 (for n is even/odd, resp.) to n-2. For every d,
     # take an A extension and then a B extension if it exists.
     n = LA.dimension
     for d in range(2+(n%2), n-1, 2):
-        one_extension = extendLA(LA, d, extType='A')
-        one_extensions.append(one_extension)
+        ext = extendLA(LA, d, extType='A')
+        exts = extendRecursively(ext, maxDimension)
+        extensions.append(ext)
+        extensions.extend(exts)
         d += 2
-
-    extensions = []
-    extensions.extend(one_extensions)
-
-    # Recursively find all extensions from the one-fold extensions
-    for one_extension in one_extensions:
-#        extensions.extend(extendRecursively(one_extension, depth - 1))
-        extensions.extend(extendRecursively(one_extension, maxDimension))
 
     return extensions
     
@@ -793,7 +783,6 @@ def __main__():
     for L in Ls:
         if L.dimension < max_dim:
             print('Extending {}'.format(L.simple_repr()))
-#            found.extend(extendStandard(LA=L, depth=max_dim-L.dimension))
             found.extend(extendStandard(LA=L, maxDimension=max_dim))
 
     # sort algebras in order of dimension and output
