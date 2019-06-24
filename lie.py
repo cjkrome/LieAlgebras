@@ -648,43 +648,43 @@ def print_LA(LA, verbose=False):
 # Extends a lie algebra, checking for all possible d values.
 # This function is iterative (no recursion).
 def FirstExtendLieAlgebra(LA):
-    NewLieList = []
+    extensions = []
 
     # Check for every d from 2/3 (for n is even/odd, resp.) to n-2.
     n = LA.dimension
     for d in range(2+(n%2), n-1, 2):
-        newLA = extend_LA(LA, d, extType='A')
-        NewLieList.append(newLA)
-        # Generate extended type B LA from newLA
-        if newLA.dimension % 2 == 1:
-            newLA_B = extend_LA(newLA, newLA.d, extType='B')
-            NewLieList.append(newLA_B)
+        extension = extend_LA(LA, d, extType='A')
+        extensions.append(extension)
+        # Generate extended type B LA from extension
+        if extension.dimension % 2 == 1:
+            extension_B = extend_LA(extension, extension.d, extType='B')
+            extensions.append(extension_B)
         d += 2
-    return NewLieList
+    return extensions
 
 # Extends a lie algebra using the d value of LA.
 def ExtendLieAlgebra(LA):
-    NewLieList = []
+    extensions = []
     if LA.type == 'B':
-        return NewLieList
+        return extensions
 
     d = LA.d # start d value
     try:
-        newLA = extend_LA(LA, d, extType='A')
-        NewLieList.append(newLA)
+        extension = extend_LA(LA, d, extType='A')
+        extensions.append(extension)
 
-        # Generate extended type B LA from newLA
-        if newLA.dimension % 2 == 1:
+        # Generate extended type B LA from extension
+        if extension.dimension % 2 == 1:
             try:
-                newLA_B = extend_LA(newLA, newLA.d, extType='B')
-                NewLieList.append(newLA_B)
+                extension_B = extend_LA(extension, extension.d, extType='B')
+                extensions.append(extension_B)
             except:
-                print('Failed B extension of {}'.format(newLA))
+                print('Failed B extension of {}'.format(extension))
     except:
         print('Failed A extension of {}'.format(LA))
 
 
-    return NewLieList
+    return extensions
 
 def RecursiveExtension(LA, depth):
     ret = []
