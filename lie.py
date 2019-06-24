@@ -628,8 +628,8 @@ def extendRecursively(LA, maxDimension):
     if LA.dimension == maxDimension:
         return []
     # Can't extend type B
-    if LA.type == 'B':
-        return []
+#    if LA.type == 'B':
+#        return []
 
     extensions = []
     # Take type A extension
