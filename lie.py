@@ -591,7 +591,7 @@ def print_LA(LA, verbose=False):
             
 # Accepts a lie algebra and a d value, increments the dimension, and then
 # adds the new brackets.
-def extend_LA(LA, d, extType):
+def extendLA(LA, d, extType):
     n = LA.dimension
     n2 = n + 1  # The dimension of the new Lie Algebras
 
@@ -643,7 +643,7 @@ def extend_LA(LA, d, extType):
     new_LA.create_jacobi_tests()
     return new_LA
 
-def recursiveExtension(LA, depth):
+def extendRecursively(LA, depth):
     # Reached our maximum depth
     if depth < 1:
         return []
@@ -654,17 +654,17 @@ def recursiveExtension(LA, depth):
     extensions = []
     # Take type A extension
     try:
-        extension = extend_LA(LA, LA.d, extType='A')
+        extension = extendLA(LA, LA.d, extType='A')
         extensions.append(extension)
         # Make recursive call
-        extensions.extend(recursiveExtension(extension, depth-1))
+        extensions.extend(extendRecursively(extension, depth-1))
     except:
         print('Failed A extension of {}'.format(LA))
 
     # Take type B extension if it exists
     if LA.dimension % 2 == 1:
         try:
-            extension = extend_LA(LA, LA.d, extType='B')
+            extension = extendLA(LA, LA.d, extType='B')
             extensions.append(extension)
             # No recursive call for type B -- they can't be extended
         except:
@@ -683,7 +683,7 @@ def extendStandard(LA, depth):
     # take an A extension and then a B extension if it exists.
     n = LA.dimension
     for d in range(2+(n%2), n-1, 2):
-        one_extension = extend_LA(LA, d, extType='A')
+        one_extension = extendLA(LA, d, extType='A')
         one_extensions.append(one_extension)
         d += 2
 
@@ -692,7 +692,7 @@ def extendStandard(LA, depth):
 
     # Recursively find all extensions from the one-fold extensions
     for one_extension in one_extensions:
-        extensions.extend(recursiveExtension(one_extension, depth - 1))
+        extensions.extend(extendRecursively(one_extension, depth - 1))
 
     return extensions
     
