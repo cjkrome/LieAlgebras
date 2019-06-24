@@ -654,17 +654,16 @@ def ExtendLA(LA):
     try:
         extension = extend_LA(LA, d, extType='A')
         extensions.append(extension)
-
-        # Generate extended type B LA from extension
-        if extension.dimension % 2 == 1:
-            try:
-                extension_B = extend_LA(extension, extension.d, extType='B')
-                extensions.append(extension_B)
-            except:
-                print('Failed B extension of {}'.format(extension))
     except:
         print('Failed A extension of {}'.format(LA))
 
+    # Generate extended type B LA from extension
+    if LA.dimension % 2 == 1:
+        try:
+            extension_B = extend_LA(LA, LA.d, extType='B')
+            extensions.append(extension_B)
+        except:
+            print('Failed B extension of {}'.format(LA))
 
     return extensions
 
@@ -689,10 +688,6 @@ def extendL(LA, depth):
     for d in range(2+(n%2), n-1, 2):
         one_extension = extend_LA(LA, d, extType='A')
         one_extensions.append(one_extension)
-        # Generate extended type B LA from extension if exists
-        if one_extension.dimension % 2 == 1:
-            one_extension_B = extend_LA(one_extension, one_extension.d, extType='B')
-            one_extensions.append(one_extension_B)
         d += 2
 
     extensions = []
@@ -812,11 +807,6 @@ def __main__():
     found = []
     # max_dim = 14
     max_dim = 12
-
-    just_one = False
-    if (just_one):
-        Ls = [ L6, L7, L8 ]
-        max_dim = 14
 
     for L in Ls:
         if L.dimension < max_dim:
