@@ -497,21 +497,6 @@ def GetEqTerm(eqn):
     else:
         return 0
 
-
-# Check if a 'd' value is valid for a given 'n'.
-def IsValidD(n, d):
-    # This if statement always evaluates to true.
-    if n - d % 2 == 0:
-        # This code is probably never exercised. The difference between n and d
-        # is always even.
-        print('This is a big surprise')
-        valid = (n - 2) > d
-        print('isvalid {} {} valid = {}'.format(n, d, valid))
-    else:
-        valid = (n - 1) > d
-    return valid
-
-
 # Accepts a lie algebra and a d value, increments the dimension, and then
 # adds the new brackets.
 def extend_LA(LA, d, extType):
@@ -664,14 +649,10 @@ def print_LA(LA, verbose=False):
 # This function is iterative (no recursion).
 def FirstExtendLieAlgebra(LA):
     NewLieList = []
-    if LA.type == 'B':
-        return NewLieList
 
-    if LA.dimension % 2 == 0:
-        d = 2
-    else:
-        d = 3
-    while IsValidD(LA.dimension, d):
+    # Check for every d from 2/3 (for n is even/odd, resp.) to n-2.
+    n = LA.dimension
+    for d in range(2+(n%2), n-1, 2):
         newLA = extend_LA(LA, d, extType='A')
         NewLieList.append(newLA)
         # Generate extended type B LA from newLA
@@ -790,6 +771,27 @@ def print_latex(LAs):
     lines.append('\n\\end{document}\n')
     return '\n'.join(lines)
 
+def print_csv(LAs):
+    lines = []
+    lines.append('m, d, n, type, solns')
+    
+    for LA in LAs:
+        s = LA.gsolutions
+        if s == None:
+            sol = ''
+        elif s == 'No solutions':
+            sol = '0'
+        elif s == 'Infinite number of solutions':
+            sol = '$\infty$'
+        elif not LA.jacobi_tests_consistent():
+            sol = '-'
+        else:
+            sol = str(max([1, len(LA.gsolutions)]))
+
+        line = '{}, {}, {}, {}, {}'.format(LA.extension, LA.d, LA.dimension, LA.type, sol);
+        lines.append(line);
+    return '\n'.join(lines)
+
 
 def __main__():
     L4 = create_L(4)
@@ -805,10 +807,11 @@ def __main__():
     L14 = create_L(14)
     L15 = create_L(15)
 
-    Ls = [ L4, L5, L6, L7, L8, L9, L10, L11, L12, L13 ]#, L14, L15 ]
+    Ls = [ L4, L5, L6, L7, L8 ]#, L9, L10, L11, L12, L13 ]#, L14, L15 ]
 
     found = []
-    max_dim = 14
+    # max_dim = 14
+    max_dim = 12
 
     just_one = False
     if (just_one):
@@ -817,6 +820,7 @@ def __main__():
 
     for L in Ls:
         if L.dimension < max_dim:
+            print('Extending {}'.format(L.simple_repr()))
             found.extend(ExtendL(LA=L, depth=max_dim-L.dimension))
 
     # sort algebras in order of dimension and output
@@ -831,6 +835,10 @@ def __main__():
 
     f = open('output/output.tex', 'w')
     f.write(print_latex(found))
+    f.close()
+
+    f = open('output/output.csv', 'w')
+    f.write(print_csv(found))
     f.close()
 
     f = open('output/grid.dot', 'w') 
