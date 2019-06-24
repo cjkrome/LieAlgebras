@@ -698,7 +698,7 @@ def extendL(LA, depth):
     extensions = []
     extensions.extend(one_extensions)
 
-    # Recursively find all extensions from the first extensions
+    # Recursively find all extensions from the one-fold extensions
     for one_extension in one_extensions:
         extensions.extend(recursiveExtension(one_extension, depth - 1))
 
