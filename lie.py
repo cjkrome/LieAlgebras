@@ -169,8 +169,6 @@ class LieAlgebra:
     # algebra. (Alpha is optional and defaults to 1)
     def add_bracket(self, i, j, k, alpha=1):
         res = BracketResult(k, alpha)
-        #if self.type == 'B':
-        #    print('bracket for {},{} = {},{}'.format(i, j, k, alpha));
         self.brackets[i, j] = res
 
     # Accepts i, j, and k as eigenvalues, converts them to indices, and then
@@ -582,26 +580,26 @@ def extendLA(LA, d, extType):
         lastValue = n2 + 2*d - 3
 
     try:
-        new_LA = deepcopy(LA)
+        ext = deepcopy(LA)
     except:
         print('Failed to extend {}: failure in deep copy'.format(LA))
         raise
 
-    new_LA.extension += 1
-    new_LA.dimension += 1
-    new_LA.d = d
-    new_LA.type = extType
-    new_LA.parent = LA
+    ext.extension += 1
+    ext.dimension += 1
+    ext.d = d
+    ext.type = extType
+    ext.parent = LA
 
-    graph.add_node(new_LA)
-    graph.add_edge(LA, new_LA);
+    graph.add_node(ext)
+    graph.add_edge(LA, ext);
 
     if extType == 'A':
-        new_LA.add_bracket(1, n, n2)
+        ext.add_bracket(1, n, n2)
     else:
-        new_LA.add_bracket(2, n, n2)
+        ext.add_bracket(2, n, n2)
 
-    extension = new_LA.extension
+    extNum = ext.extension
     startValue = d
 
     # Odd case
@@ -610,34 +608,30 @@ def extendLA(LA, d, extType):
         for i in range(startValue, centerValue + 1):
             j = lastValue - i
             if i != j:
-                new_LA.add_eigenvalue_bracket(
-                    i, j, lastValue, d, n, extType, extension)
+                ext.add_eigenvalue_bracket(
+                    i, j, lastValue, d, n, extType, extNum)
     # Even case
     else:
         centerValue = int((lastValue - 1) / 2.0)
         for i in range(startValue, centerValue + 1):
             j = lastValue - i
-            new_LA.add_eigenvalue_bracket(
-                i, j, lastValue, d, n, extType, extension)
+            ext.add_eigenvalue_bracket(
+                i, j, lastValue, d, n, extType, extNum)
 
-    new_LA.create_jacobi_tests()
-    return new_LA
+    ext.create_jacobi_tests()
+    return ext
 
-def extendRecursively(LA, maxDimension):
+def extendRecursively(LA, extensions, maxDimension):
     # Reached our maximum depth
     if LA.dimension == maxDimension:
         return []
-    # Can't extend type B
-#    if LA.type == 'B':
-#        return []
 
-    extensions = []
     # Take type A extension
     try:
         extension = extendLA(LA, LA.d, extType='A')
         extensions.append(extension)
         # Make recursive call
-        extensions.extend(extendRecursively(extension, maxDimension))
+        extendRecursively(extension, extensions, maxDimension)
     except:
         print('Failed A extension of {}'.format(LA))
 
@@ -650,9 +644,6 @@ def extendRecursively(LA, maxDimension):
         except:
             print('Failed B extension of {}'.format(LA))
 
-    return extensions
-
-
 # This extends a standard (L) algebra. Find all the one-fold
 # extensions for different d values then recursively find remaining
 # extensions up to depth.
@@ -664,9 +655,9 @@ def extendStandard(LA, maxDimension):
     n = LA.dimension
     for d in range(2+(n%2), n-1, 2):
         ext = extendLA(LA, d, extType='A')
-        exts = extendRecursively(ext, maxDimension)
         extensions.append(ext)
-        extensions.extend(exts)
+        exts = extendRecursively(ext, extensions, maxDimension)
+#        extensions.extend(exts)
         d += 2
 
     return extensions
