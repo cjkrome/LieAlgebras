@@ -113,11 +113,6 @@ def draw_graph():
     
 
 #------------------------------------------------------------------------------
-# JacobiIdentities
-#------------------------------------------------------------------------------
-#class JacobiIdentities:
-
-#------------------------------------------------------------------------------
 # Class LieAlgebra
 #------------------------------------------------------------------------------
 
@@ -151,8 +146,6 @@ class LieAlgebra:
             str(self.extension), self.type, self.d, self.dimension))
 
     def latex_repr(self):
-        #return latex("$m_{{{}}}({}, {})$".format(
-        #    str(self.extension) + self.type, self.d, self.dimension))
         return latex("$\\frakm_{{{}}}({}, {})$".format(
             str(self.extension) + self.type, self.d, self.dimension))
 
@@ -164,6 +157,10 @@ class LieAlgebra:
                 (f.dimension == None or self.dimension in f.dimension) and
                 (f.extension == None or self.extension in f.extension) and
                 (f.type == None or self.type == f.type))
+
+    #------------------------------------------------------------
+    # Functions to create brackets
+    #------------------------------------------------------------
 
     # Accepts i, j, and k as indices and then adds a new bracket to the lie
     # algebra. (Alpha is optional and defaults to 1)
@@ -252,10 +249,7 @@ class LieAlgebra:
         lines.append('\\end{align*}')
 
 
-    # Find all of the non-trivial triples that need to be tested.
-    def create_jacobi_tests(self):
-        self.alpha2soln = []
-
+    def get_jacobi_indices_old(self):
         Y = self.create_Y()
         U = np.dot(Y, Y.transpose())
         self.Y = Y
@@ -289,13 +283,29 @@ class LieAlgebra:
             if not isIn:
                 allIndices.append(indices)
         #self.JacobiToTest = []
+        isets = []
         for indices in allIndices:
             i = indices[0][0]+1
             j = indices[0][1]+1
             k = indices[0][2]+1
-            resultset = test_jacobi(self, i, j, k)
+            isets.append((i,j,k))
+#            resultset = test_jacobi(self, i, j, k)
+#            if resultset != None:
+#                self.jacobi_tests[(i, j, k)] = resultset
+        return isets
+
+    # Find all of the non-trivial triples that need to be tested.
+    def create_jacobi_tests(self):
+        self.alpha2soln = []
+#        isets = self.get_jacobi_indices_old()
+        if self.type == 'A':
+            isets = get_jacobi_indices_typeA(self.dimension-1, self.d)
+        else:
+            isets = get_jacobi_indices_typeB(self.dimension-1, self.d)
+        for iset in isets:
+            resultset = test_jacobi(self, iset[0], iset[1], iset[2])
             if resultset != None:
-                self.jacobi_tests[(i, j, k)] = resultset
+                self.jacobi_tests[iset] = resultset
 
         # Groebner basis and solution
         eqns = self.jacobi_tests.values()
@@ -374,6 +384,10 @@ class LieAlgebra:
         corank = numTriples - rank
         return Y
 
+    #------------------------------------------------------------
+    # Output functions
+    #------------------------------------------------------------
+
     def print_jacobi_tests_impl(self, lines, tests):
         lines.append('\\begin{align*}')
         for triple,eqn in tests.items():
@@ -442,13 +456,49 @@ class LieAlgebra:
 # Functions
 #------------------------------------------------------------------------------
 
-def create_L(dimension):
-    LA = LieAlgebra(dimension)
-    LA.d = 2
-    LA.type = 'A'
-    for j in range(2, dimension):
-        LA.add_bracket(1, j, j + 1, 1)
-    return LA
+def get_jacobi_indices_typeA(n, d):
+    isets = []
+    imax = max(1, int((n+2-2*d)/3))
+    for i in range(1, imax+1):
+        if i == 1:
+            jmax = math.ceil((n-d+2)/2)
+        else:
+            jmax = math.ceil((n+5-2*d-i)/2)
+        for j in range(i+1, jmax):
+            if i == 1:
+                k = n-d+2-j
+            else:
+                k = n+5-2*d-i-j
+            isets.append((i,j,k))
+            j = j + 1
+        i = i + 1
+    return isets
+
+def get_jacobi_indices_typeB(n, d):
+    isets = []
+    imax = max(1, int((n-d+1)/3))
+    for i in range(1, imax+1):
+        if i == 1:
+            jmax = math.ceil((n+1)/2)
+        else:
+            jmax = math.ceil((n-d+4-i)/2)
+        for j in range(i+1, jmax):
+            if i == 1:
+                k = n+1-j
+            else:
+                k = n-d+4-i-j
+            isets.append((i,j,k))
+            j = j + 1
+        i = i + 1
+    return isets
+
+#print(get_jacobi_indices(5, 2))
+#print(get_jacobi_indices(6, 2))
+#print(get_jacobi_indices(7, 2))
+#print(get_jacobi_indices(8, 2))
+#print(get_jacobi_indices(10, 4))
+#print(get_jacobi_indices_typeB(7, 2))
+#print(get_jacobi_indices(10, 2))
 
 # Test an individual triple to see if it is trivial.
 def test_jacobi(LA, i, j, k):
@@ -495,6 +545,10 @@ def Y_test(LA):
     v = np.linalg.solve(U, ones)
     print("v = \n{}".format(v))
     """
+
+#------------------------------------------------------------
+# Output functions
+#------------------------------------------------------------
 
 def mystr(x):
     return '{:.0f}'.format(x)
@@ -546,98 +600,6 @@ def print_LA(LA, verbose=False):
 
     return '\n'.join(lines)
             
-# Accepts a lie algebra and a d value, increments the dimension, and then
-# adds the new brackets.
-def extendLA(LA, d, extType):
-    n = LA.dimension
-
-    try:
-        ext = deepcopy(LA)
-    except:
-        print('Failed to extend {}: failure in deep copy'.format(LA))
-        raise
-
-    ext.extension += 1
-    ext.dimension += 1
-    ext.d = d
-    ext.type = extType
-    ext.parent = LA
-
-    graph.add_node(ext)
-    graph.add_edge(LA, ext);
-
-    if extType == 'A':
-        ext.add_bracket(1, n, n+1, 1)
-    else:
-        ext.add_bracket(2, n, n+1, 1)
-
-    extNum = ext.extension
-
-    # This code finds all brackets such that the eigenvalues sum
-    # to the newly-added eigenvalue. For n=11 and d=3:
-    #  i | 1  2  3  4  5  6  7  8  9  10 | 11
-    #  e | 1  3  4  5  6  7  8  9  10 11 | 12
-    #               |_____|
-    #            |___________|
-    #         |_________________|
-    #         i                 j
-
-    i = 2
-    j = n-d+3-i
-    indexMax = math.floor((n-d+2)/2)
-    if extType == 'B':
-        j = n+2-i
-        indexMax = (n+1)/2
-    while (i <= indexMax):
-        ext.add_bracket_smart(
-            i, j, n+1, d, n, extType, extNum)
-        i = i+1
-        j = j-1
-
-    ext.create_jacobi_tests()
-    return ext
-
-def extendRecursively(LA, extensions, maxDimension):
-    # Reached our maximum depth
-    if LA.dimension == maxDimension:
-        return []
-
-    # Take type A extension
-    try:
-        extension = extendLA(LA, LA.d, extType='A')
-        extensions.append(extension)
-        # Make recursive call
-        extendRecursively(extension, extensions, maxDimension)
-    except:
-        print('Failed A extension of {}'.format(LA))
-
-    # Take type B extension if it exists
-    if LA.dimension % 2 == 1:
-        try:
-            extension = extendLA(LA, LA.d, extType='B')
-            extensions.append(extension)
-            # No recursive call for type B -- they can't be extended
-        except:
-            print('Failed B extension of {}'.format(LA))
-
-# This extends a standard (L) algebra. Find all the one-fold
-# extensions for different d values then recursively find remaining
-# extensions up to depth.
-def extendStandard(LA, maxDimension):
-    extensions = []
-
-    # Check for every d from 2/3 (for n is even/odd, resp.) to n-2. For every d,
-    # take an A extension and then a B extension if it exists.
-    n = LA.dimension
-    for d in range(2+(n%2), n-1, 2):
-        ext = extendLA(LA, d, extType='A')
-        extensions.append(ext)
-        exts = extendRecursively(ext, extensions, maxDimension)
-#        extensions.extend(exts)
-        d += 2
-
-    return extensions
-    
 def print_latex(LAs):
     lines = []
     lines.append(
@@ -725,6 +687,111 @@ def print_csv(LAs):
         line = '{}, {}, {}, {}, {}'.format(LA.extension, LA.d, LA.dimension, LA.type, sol);
         lines.append(line);
     return '\n'.join(lines)
+
+#------------------------------------------------------------
+# Functions to create extensions
+#------------------------------------------------------------
+
+# Accepts a lie algebra and a d value, increments the dimension, and then
+# adds the new brackets.
+def extendLA(LA, d, extType):
+    n = LA.dimension
+
+    try:
+        ext = deepcopy(LA)
+    except:
+        print('Failed to extend {}: failure in deep copy'.format(LA))
+        raise
+
+    ext.extension += 1
+    ext.dimension += 1
+    ext.d = d
+    ext.type = extType
+    ext.parent = LA
+
+    graph.add_node(ext)
+    graph.add_edge(LA, ext);
+
+    if extType == 'A':
+        ext.add_bracket(1, n, n+1, 1)
+    else:
+        ext.add_bracket(2, n, n+1, 1)
+
+    extNum = ext.extension
+
+    # This code finds all brackets such that the eigenvalues sum
+    # to the newly-added eigenvalue. For n=11 and d=3:
+    #  i | 1  2  3  4  5  6  7  8  9  10 | 11
+    #  e | 1  3  4  5  6  7  8  9  10 11 | 12
+    #               |_____|
+    #            |___________|
+    #         |_________________|
+    #         i                 j
+
+    i = 2
+    if extType == 'A':
+        j = n-d+3-i
+        imax = math.floor((n-d+2)/2)
+    else:
+        j = n+2-i
+        imax = (n+1)/2
+
+    while (i <= imax):
+        ext.add_bracket_smart(
+            i, j, n+1, d, n, extType, extNum)
+        i = i+1
+        j = j-1
+
+    ext.create_jacobi_tests()
+    return ext
+
+def extendRecursively(LA, extensions, maxDimension):
+    # Reached our maximum depth
+    if LA.dimension == maxDimension:
+        return []
+
+    # Take type A extension
+    try:
+        extension = extendLA(LA, LA.d, extType='A')
+        extensions.append(extension)
+        # Make recursive call
+        extendRecursively(extension, extensions, maxDimension)
+    except:
+        print('Failed A extension of {}'.format(LA))
+
+    # Take type B extension if it exists
+    if LA.dimension % 2 == 1:
+        try:
+            extension = extendLA(LA, LA.d, extType='B')
+            extensions.append(extension)
+            # No recursive call for type B -- they can't be extended
+        except:
+            print('Failed B extension of {}'.format(LA))
+
+# This extends a standard (L) algebra. Find all the one-fold
+# extensions for different d values then recursively find remaining
+# extensions up to depth.
+def extendStandard(LA, maxDimension):
+    extensions = []
+
+    # Check for every d from 2/3 (for n is even/odd, resp.) to n-2. For every d,
+    # take an A extension and then a B extension if it exists.
+    n = LA.dimension
+    for d in range(2+(n%2), n-1, 2):
+        ext = extendLA(LA, d, extType='A')
+        extensions.append(ext)
+        extendRecursively(ext, extensions, maxDimension)
+        d += 2
+
+    return extensions
+    
+def create_L(dimension):
+    LA = LieAlgebra(dimension)
+    LA.d = 2
+    LA.type = 'A'
+    for j in range(2, dimension):
+        LA.add_bracket(1, j, j + 1, 1)
+    return LA
 
 
 def __main__():
