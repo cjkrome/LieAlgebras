@@ -167,30 +167,27 @@ class LieAlgebra:
 
     # Accepts i, j, and k as indices and then adds a new bracket to the lie
     # algebra. (Alpha is optional and defaults to 1)
-    def add_bracket(self, i, j, k, alpha=1):
-        res = BracketResult(k, alpha)
-        self.brackets[i, j] = res
+    def add_bracket(self, i, j, k, alpha):
+        self.brackets[i, j] = BracketResult(k, alpha)
 
     # Accepts i, j, and k as eigenvalues, converts them to indices, and then
     # uses the indices to add a bracket.
-    def add_eigenvalue_bracket(self, i, j, k, d, n, extType, ext):
-        i = self.convert_eigenvalue_to_index(i, d, n, extType)
-        j = self.convert_eigenvalue_to_index(j, d, n, extType)
-        k = self.convert_eigenvalue_to_index(k, d, n, extType)
-
+    def add_bracket_smart(self, i, j, k, d, n, extType, ext):
         # Hard-code structure constant of 1 for first B extensions
         if extType == 'B' and i == 2:
-            self.add_bracket(i, j, k)
+            alpha = 1
         elif extType == 'A' and ext == 1:
             # 1st extension variable reduction hack (proposition 5.1)
-            self.add_bracket(i, j, k, (-1)**i)
+            alpha = (-1)**i
         elif extType == 'A' and ext == 2:
             # 2nd extension variable reduction hack (proposition 5.2)
-            self.add_bracket(i, j, k, ((-1)**i)*(((n-d+3)//2)-i))
+            alpha = ((-1)**i)*(((n-d+3)//2)-i)
         else:
             # This format ensures correct Latex printing:
             alphatext = "alpha_{},{}^{}".format(i, j, k)
-            self.add_bracket(i, j, k, Symbol(alphatext))
+            alpha = Symbol(alphatext)
+
+        self.add_bracket(i, j, k, alpha)
 
     # Performs the bracket operation [e_i, e_j]
     def bracket(self, i, j):
@@ -211,26 +208,6 @@ class LieAlgebra:
             return self.brackets[(j, i)] * (newAlpha * -1)
         else:
             return 0
-
-    def convert_index_to_eigenvalue(self, index, la_type, d=0):
-        if la_type == 'A':
-            if d == 0:
-                d = self.d
-            return index + d - 2
-        return index + 2 * d - 3
-
-    def convert_eigenvalue_to_index(self, eigenval, d, n, extType):
-        if d == 0:
-            # if d is zero, then set it to self.d
-            raise "d == 0"
-        if eigenval == 1:
-            raise "eigenval == 1"
-        if extType == 'A':
-            return eigenval - d + 2
-        else:
-            if eigenval < n + 2 * d - 3:
-                return eigenval - d + 2
-            return n+1
         
     def print_soln_brackets(self, lines):
         lines.append("\\\\")
@@ -470,7 +447,7 @@ def create_L(dimension):
     LA.d = 2
     LA.type = 'A'
     for j in range(2, dimension):
-        LA.add_bracket(1, j, j + 1)
+        LA.add_bracket(1, j, j + 1, 1)
     return LA
 
 # Test an individual triple to see if it is trivial.
@@ -573,11 +550,6 @@ def print_LA(LA, verbose=False):
 # adds the new brackets.
 def extendLA(LA, d, extType):
     n = LA.dimension
-    n2 = n + 1  # The dimension of the new Lie Algebras
-
-    lastValue = n + d - 1  # The last eigenvalue
-    if extType == 'B':
-        lastValue = n2 + 2*d - 3
 
     try:
         ext = deepcopy(LA)
@@ -595,28 +567,32 @@ def extendLA(LA, d, extType):
     graph.add_edge(LA, ext);
 
     if extType == 'A':
-        ext.add_bracket(1, n, n2)
+        ext.add_bracket(1, n, n+1, 1)
     else:
-        ext.add_bracket(2, n, n2)
+        ext.add_bracket(2, n, n+1, 1)
 
     extNum = ext.extension
-    startValue = d
 
-    # Odd case
-    if (n - d) % 2 != 0:
-        centerValue = int(lastValue / 2)
-        for i in range(startValue, centerValue + 1):
-            j = lastValue - i
-            if i != j:
-                ext.add_eigenvalue_bracket(
-                    i, j, lastValue, d, n, extType, extNum)
-    # Even case
-    else:
-        centerValue = int((lastValue - 1) / 2.0)
-        for i in range(startValue, centerValue + 1):
-            j = lastValue - i
-            ext.add_eigenvalue_bracket(
-                i, j, lastValue, d, n, extType, extNum)
+    # This code finds all brackets such that the eigenvalues sum
+    # to the newly-added eigenvalue. For n=11 and d=3:
+    #  i | 1  2  3  4  5  6  7  8  9  10 | 11
+    #  e | 1  3  4  5  6  7  8  9  10 11 | 12
+    #               |_____|
+    #            |___________|
+    #         |_________________|
+    #         i                 j
+
+    i = 2
+    j = n-d+3-i
+    indexMax = math.floor((n-d+2)/2)
+    if extType == 'B':
+        j = n+2-i
+        indexMax = (n+1)/2
+    while (i <= indexMax):
+        ext.add_bracket_smart(
+            i, j, n+1, d, n, extType, extNum)
+        i = i+1
+        j = j-1
 
     ext.create_jacobi_tests()
     return ext
