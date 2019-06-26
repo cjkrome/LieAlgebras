@@ -640,21 +640,30 @@ def print_latex(LAs):
         stop = min(n, (i+1)*num_per_col)
         for LA in LAs[i*num_per_col:stop]:
             s = LA.gsolutions
-            if s == None:
+            if not LA.jacobi_tests_consistent():
+                sol = '0'
+                jac = ''
+            elif s == None:
                 sol = ''
+                jac = ''
             elif s == 'No solutions':
                 sol = '0'
+                jac = ''
             elif type(s) == str and s.startswith('Infinite number of solutions'):
                 sol = '$\\infty$'
+                jac = '$\\surd$'
             else:
                 sol = str(max([1, len(LA.gsolutions)]))
-            jac = '$\\surd$' if LA.jacobi_tests_consistent() else '-'
-            if not LA.jacobi_tests_consistent():
-                lines.append('\\tiny{{{}}} & {}  & {}  & {} \\\\'.format(
-                    LA.simple_repr(), LA.latex_repr(), jac, '-'))
-            else:
-                lines.append('\\tiny{{{}}} & {} & {}  & {} \\\\'.format(
-                    LA.simple_repr(), LA.latex_repr(), jac, sol))
+                jac = '$\\surd$'
+#            jac = '$\\surd$' if LA.jacobi_tests_consistent() else '-'
+#            if not LA.jacobi_tests_consistent():
+#                lines.append('\\tiny{{{}}} & {}  & {}  & {} \\\\'.format(
+#                    LA.simple_repr(), LA.latex_repr(), jac, '-'))
+#            else:
+#                lines.append('\\tiny{{{}}} & {} & {}  & {} \\\\'.format(
+#                    LA.simple_repr(), LA.latex_repr(), jac, sol))
+            lines.append('\\tiny{{{}}} & {} & {}  & {} \\\\'.format(
+                LA.simple_repr(), LA.latex_repr(), jac, sol))
             lines.append('\hline')
         lines.append('\\end{tabular}')
         lines.append('\\vfill')
@@ -804,21 +813,6 @@ def create_L(dimension):
 
 
 def __main__():
-#    L4 = create_L(4)
-#    L5 = create_L(5)
-#    L6 = create_L(6)
-#    L7 = create_L(7)
-#    L8 = create_L(8)
-#    L9 = create_L(9)
-#    L10 = create_L(10)
-#    L11 = create_L(11)
-#    L12 = create_L(12)
-#    L13 = create_L(13)
-#    L14 = create_L(14)
-#    L15 = create_L(15)
-#
-#    Ls = [ L4, L5, L6, L7, L8]#, L9, L10, L11] #, L12, L13 ]#, L14, L15 ]
-
     max_dim = 12
     Ls = [create_L(n) for n in range(4, max_dim)]
 
