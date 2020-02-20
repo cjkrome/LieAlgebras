@@ -303,7 +303,6 @@ class LieAlgebra:
     # Find all of the non-trivial triples that need to be tested.
     def create_jacobi_tests(self):
         self.alpha2soln = []
-#        isets = self.get_jacobi_indices_old()
         if self.type == 'A':
             isets = get_jacobi_indices_typeA(self.dimension-1, self.d)
         else:
@@ -334,7 +333,9 @@ class LieAlgebra:
             syms.extend(eqn.free_symbols)
         syms = set(syms)
         n = len(syms)
-        new_syms = ['x_{{{}}}'.format(i) for i in range(1,n+1)]
+        #new_syms = ['x_{{{}}}'.format(i) for i in range(1,n+1)]
+        new_sym_strings = ['x_{{{}}}'.format(i) for i in range(1,n+1)]
+        new_syms = [Symbol('x_{}'.format(i)) for i in range(1,n+1)]
         self.old2new = list(zip(syms, new_syms))
         self.new2old = dict(zip(new_syms, syms))
 
@@ -347,7 +348,7 @@ class LieAlgebra:
             for solution in self.gsolutions:
                 a2s = {}
                 for i,v in enumerate(self.geqns.gens):
-                    a2s[self.new2old[str(v)]] = solution[i]
+                    a2s[self.new2old[v]] = solution[i]
                 self.alpha2soln.append(a2s)
 
         #except Exception as e:
@@ -420,8 +421,10 @@ class LieAlgebra:
                 lines.append('Solution {}:\\\\'.format(i+1))
                 lines.append('\\begin{align*}')
                 for i,v in enumerate(self.geqns.gens):
+#                    lines.append('{} &= {} \\\\'.format(
+#                        latex(self.new2old[str(v)]), solution[i]))
                     lines.append('{} &= {} \\\\'.format(
-                        latex(self.new2old[str(v)]), solution[i]))
+                        latex(self.new2old[v]), solution[i]))
                 
                 lines.append('\\end{align*}')
 
@@ -514,7 +517,7 @@ def test_jacobi(LA, i, j, k):
     r2 = LA.bracket(j, LA.bracket(k, i))
     r3 = LA.bracket(k, LA.bracket(i, j))
     if r1 != 0 or r2 != 0 or r3 != 0:
-        ret = Eq(GetEqTerm(r1) + GetEqTerm(r2) + GetEqTerm(r3))
+        ret = Eq(GetEqTerm(r1) + GetEqTerm(r2) + GetEqTerm(r3), 0)
         # Eq returns True if the equality is trivially equal.
         if ret == True:
             #print('equation for {} is true: {} + {} + {}'.format(
@@ -718,7 +721,7 @@ def extendLA(LA, d, extType):
     try:
         ext = deepcopy(LA)
     except:
-        print('Failed to extend {}: failure in deep copy'.format(LA))
+        print('Failed to extend {}: failure in deep copy: {}'.format(LA, sys.exc_info()[0]))
         raise
 
     ext.extension += 1
@@ -774,8 +777,8 @@ def extendRecursively(LA, extensions, maxDimension):
         extensions.append(extension)
         # Make recursive call
         extendRecursively(extension, extensions, maxDimension)
-    except:
-        print('Failed A extension of {}'.format(LA))
+    except Exception as e:
+        print('Failed A extension of {}: {}'.format(LA, e))
 
     # Take type B extension if it exists
     if LA.dimension % 2 == 1:
@@ -813,15 +816,15 @@ def create_L(dimension):
 
 
 def __main__():
-    max_dim = 12
+    max_dim = 14
     Ls = [create_L(n) for n in range(4, max_dim)]
+#    Ls = [create_L(n) for n in [8]]
 
     found = []
 
     for L in Ls:
-        if L.dimension < max_dim:
-            print('Extending {}'.format(L.simple_repr()))
-            found.extend(extendStandard(LA=L, maxDimension=max_dim))
+        print('Extending {}'.format(L.simple_repr()))
+        found.extend(extendStandard(LA=L, maxDimension=max_dim))
 
     # sort algebras in order of dimension and output
     #found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))

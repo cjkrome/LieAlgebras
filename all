@@ -1,6 +1,6 @@
 #! /bin/bash
 
-python lie.py
+python3 lie.py
 
 cd output
 
@@ -36,4 +36,4 @@ else
   exit
 fi
 
-#diff -s output.csv output-gold.csv
+#diff -s output.csv output-gold-12.csv
