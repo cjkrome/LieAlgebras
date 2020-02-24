@@ -493,27 +493,9 @@ def get_jacobi_indices_impl(n, d, ext_type):
 def get_jacobi_indices_typeA(n, d):
     return get_jacobi_indices_impl(n,d,'A')
 
-# TODO: change this code to match the paper
 def get_jacobi_indices_typeB(n, d):
-    ext_type='B'
-    isets = []
-    imax = max(1, int((lam(n+1, n+1, d, 'B')-3*d+3)/3))
-    for i in range(1, imax+1):
-        jmax = math.floor((lam(n+1, n+1, d, ext_type)-lam(i, n+1, d, ext_type)-2*d+3)/2)
-        for j in range(i+1, jmax+1):
-            k = lam(n+1,n+1,d,ext_type) - lam(i,n+1,d,ext_type) - j - 2*d + 4
-            isets.append((i,j,k))
-            j = j + 1
-        i = i + 1
-    return isets
+    return get_jacobi_indices_impl(n,d,'B')
 
-#print(get_jacobi_indices(5, 2))
-#print(get_jacobi_indices(6, 2))
-#print(get_jacobi_indices(7, 2))
-#print(get_jacobi_indices(8, 2))
-#print(get_jacobi_indices(10, 4))
-#print(get_jacobi_indices_typeB(7, 2))
-#print(get_jacobi_indices(10, 2))
 
 # Test an individual triple to see if it is trivial.
 def test_jacobi(LA, i, j, k):
@@ -820,7 +802,7 @@ def create_L(dimension):
 
 
 def __main__():
-    max_dim = 8
+    max_dim = 12
     Ls = [create_L(n) for n in range(4, max_dim)]
 #    Ls = [create_L(n) for n in [8]]
 
