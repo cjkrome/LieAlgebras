@@ -467,37 +467,53 @@ class LieAlgebra:
 # Functions
 #------------------------------------------------------------------------------
 
-def get_jacobi_indices_typeA(n, d):
+# Computes lambda_i
+def lam(i, n, d, ext_type):
+    if i == 1:
+        return 1
+    if ext_type == 'A':
+        return i + (d-2)
+    else:
+        if i == n:
+            return n+2*d-3
+        return i+(d-2)
+
+def get_jacobi_indices_impl(n, d, ext_type):
     isets = []
-    imax = max(1, int((n+2-2*d)/3))
+    imax = max(1, int((lam(n+1, n+1, d, ext_type)-3*d+3)/3))
     for i in range(1, imax+1):
-        if i == 1:
-            jmax = math.ceil((n-d+2)/2)
-        else:
-            jmax = math.ceil((n+5-2*d-i)/2)
-        for j in range(i+1, jmax):
-            if i == 1:
-                k = n-d+2-j
-            else:
-                k = n+5-2*d-i-j
+        jmax = math.floor((lam(n+1, n+1, d, ext_type)-lam(i, n+1, d, ext_type)-2*d+3)/2)
+        for j in range(i+1, jmax+1):
+            k = lam(n+1,n+1,d,ext_type) - lam(i,n+1,d,ext_type) - j - 2*d + 4
             isets.append((i,j,k))
             j = j + 1
         i = i + 1
     return isets
 
+def get_jacobi_indices_typeA(n, d):
+    return get_jacobi_indices_impl(n,d,'A')
+
+# TODO: change this code to match the paper
 def get_jacobi_indices_typeB(n, d):
+    ext_type='B'
     isets = []
-    imax = max(1, int((n-d+1)/3))
+    #imax_old = max(1, int((n-d+1)/3))
+    imax = max(1, int((lam(n+1, n+1, d, 'B')-3*d+3)/3))
+    #if imax_old != imax_new:
+    #    print(n+1, n, d, imax_old, imax_new, (lam(n+1, n, d, 'B')-3*d+3)/3, (n-d+1)/3)
+    #imax = imax_new
     for i in range(1, imax+1):
-        if i == 1:
-            jmax = math.ceil((n+1)/2)
-        else:
-            jmax = math.ceil((n-d+4-i)/2)
-        for j in range(i+1, jmax):
-            if i == 1:
-                k = n+1-j
-            else:
-                k = n-d+4-i-j
+        jmax = math.floor((lam(n+1, n+1, d, ext_type)-lam(i, n+1, d, ext_type)-2*d+3)/2)
+        #if i == 1:
+        #    jmax = math.ceil((n+1)/2)
+        #else:
+        #    jmax = math.ceil((n-d+4-i)/2)
+        for j in range(i+1, jmax+1):
+            k = lam(n+1,n+1,d,ext_type) - lam(i,n+1,d,ext_type) - j - 2*d + 4
+            #if i == 1:
+            #    k = n+1-j
+            #else:
+            #    k = n-d+4-i-j
             isets.append((i,j,k))
             j = j + 1
         i = i + 1
@@ -816,7 +832,7 @@ def create_L(dimension):
 
 
 def __main__():
-    max_dim = 14
+    max_dim = 8
     Ls = [create_L(n) for n in range(4, max_dim)]
 #    Ls = [create_L(n) for n in [8]]
 
