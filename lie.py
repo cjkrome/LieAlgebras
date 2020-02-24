@@ -497,23 +497,11 @@ def get_jacobi_indices_typeA(n, d):
 def get_jacobi_indices_typeB(n, d):
     ext_type='B'
     isets = []
-    #imax_old = max(1, int((n-d+1)/3))
     imax = max(1, int((lam(n+1, n+1, d, 'B')-3*d+3)/3))
-    #if imax_old != imax_new:
-    #    print(n+1, n, d, imax_old, imax_new, (lam(n+1, n, d, 'B')-3*d+3)/3, (n-d+1)/3)
-    #imax = imax_new
     for i in range(1, imax+1):
         jmax = math.floor((lam(n+1, n+1, d, ext_type)-lam(i, n+1, d, ext_type)-2*d+3)/2)
-        #if i == 1:
-        #    jmax = math.ceil((n+1)/2)
-        #else:
-        #    jmax = math.ceil((n-d+4-i)/2)
         for j in range(i+1, jmax+1):
             k = lam(n+1,n+1,d,ext_type) - lam(i,n+1,d,ext_type) - j - 2*d + 4
-            #if i == 1:
-            #    k = n+1-j
-            #else:
-            #    k = n-d+4-i-j
             isets.append((i,j,k))
             j = j + 1
         i = i + 1
