@@ -802,7 +802,7 @@ def create_L(dimension):
 
 
 def __main__():
-    max_dim = 12
+    max_dim = 10
     Ls = [create_L(n) for n in range(4, max_dim)]
 #    Ls = [create_L(n) for n in [8]]
 
