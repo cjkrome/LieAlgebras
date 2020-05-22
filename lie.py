@@ -11,6 +11,45 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import string
 
+# https://docs.sympy.org/latest/modules/polys/internals.html
+# https://github.com/sympy/sympy/tree/70381f282f2d9d039da860e391fe51649df2779d/sympy/polys/domains
+from sympy.polys.domains import *
+domain=None
+#domain='R' # real?
+#domain='RR' # rationals?
+domain='QQ' # no idea
+domain='RealField' # not a valid domain specification
+domain = sympy.polys.domains.ComplexField()
+domain = 'ZZ'
+domain = 'FF'
+domain = 'FF_python'
+domain = 'ALG'
+domain = AlgebraicField(QQ, sqrt(2))
+
+#domain=None
+#domain=S.Reals
+
+domain='C'
+#domain='R'
+#domain='Q'
+
+#verbose = False
+
+# Returns True if the solution is real
+def is_real(soln):
+    for x in soln:
+        if x.as_real_imag()[1] != 0:
+            return False
+    return True
+
+# Returns True if the solution is rational
+def is_rational(soln):
+    for x in soln:
+        if not x.is_Rational:
+            return False
+    return True
+
+
 #------------------------------------------------------------------------------
 # Graph comparison
 #------------------------------------------------------------------------------
@@ -188,7 +227,7 @@ class LieAlgebra:
         else:
             # This format ensures correct Latex printing:
             alphatext = "alpha_{},{}^{}".format(i, j, k)
-            alpha = Symbol(alphatext)
+            alpha = Symbol(alphatext, real=True)
 
         self.add_bracket(i, j, k, alpha)
 
@@ -223,9 +262,9 @@ class LieAlgebra:
 
                 bracket = latex("[e_{{{}}},e_{{{}}}]".format(key1, key2))
                 if res.alpha in a2s:
-                    result = latex(a2s[res.alpha] * Symbol("e" + str(res.index)))
+                    result = latex(a2s[res.alpha] * Symbol("e" + str(res.index), real=True))
                 else:
-                    result = latex(res.alpha * Symbol("e" + str(res.index)))
+                    result = latex(res.alpha * Symbol("e" + str(res.index), real=True))
 
                 if i % 2 == 0:
                     lines.append("{} &= {} &".format(bracket, result))
@@ -246,7 +285,7 @@ class LieAlgebra:
             # before being converted to Latex
             # so that multiple digits stick together inside of a subscript.
             bracket = latex("[e_{{{}}},e_{{{}}}]".format(key1, key2))
-            result = latex(res.alpha * Symbol("e" + str(res.index)))
+            result = latex(res.alpha * Symbol("e" + str(res.index), real=True))
             if i % 2 == 0:
                 lines.append("{} &= {} &".format(bracket, result))
             else:
@@ -335,16 +374,38 @@ class LieAlgebra:
         n = len(syms)
         #new_syms = ['x_{{{}}}'.format(i) for i in range(1,n+1)]
         new_sym_strings = ['x_{{{}}}'.format(i) for i in range(1,n+1)]
-        new_syms = [Symbol('x_{}'.format(i)) for i in range(1,n+1)]
+        new_syms = [Symbol('x_{}'.format(i), real=True) for i in range(1,n+1)]
         self.old2new = list(zip(syms, new_syms))
         self.new2old = dict(zip(new_syms, syms))
 
         # do substitution
         eqns = [eqn.subs(self.old2new) for eqn in eqns]
 
-        self.geqns = groebner(eqns)
+        # Test
+        #print('aaa {}'.format(sympy.core.basic.Basic.as_poly(eqns)))
+        # End Test
+
+        # m8B212
+        mverbose = (self.type == 'B' and self.dimension == 12 and self.extension == 8 and self.d == 2)
+
+        if domain == 'Q':
+            self.geqns = groebner(eqns, domain='QQ')
+        else:
+            self.geqns = groebner(eqns)
         try:
             self.gsolutions = solve_poly_system(self.geqns)
+            #self.gsolutions = list(nonlinsolve(self.geqns, new_syms))# & Reals ** 18
+            if domain == 'R':
+                solns = [s for s in self.gsolutions if is_real(s)]
+                if len(solns) != len(self.gsolutions):
+                    print('** modified {} **'.format(self.simple_repr()))
+                self.gsolutions = solns
+            elif domain == 'Q':
+                solns = [s for s in self.gsolutions if is_rational(s)]
+                if len(solns) != len(self.gsolutions):
+                    print('** modified {} **'.format(self.simple_repr()))
+                self.gsolutions = solns
+
             for solution in self.gsolutions:
                 a2s = {}
                 for i,v in enumerate(self.geqns.gens):
@@ -353,7 +414,8 @@ class LieAlgebra:
 
         #except Exception as e:
         except NotImplementedError as e:
-            self.gsolutions = 'Infinite number of solutions: {}'.format(e)
+            self.gsolutions = 'Infinite number of solutions'
+            #self.gsolutions = 'Infinite number of solutions: {}'.format(e)
             #print('Infinite number of solutions: {}: {} {}'.format(self, type(e), e))
 
             #print(self.geqns)
@@ -579,16 +641,18 @@ def print_U_matrix(LA, lines):
 
 def print_LA(LA, verbose=False):    
     lines = []
-    lines.append("\section*{{{}}}".format(LA.latex_repr()))
-    lines.append('{} (this line included for string searching purposes)'.format(
-        LA.simple_repr()))
+    lines.append("\\section*{{{}}}".format(LA.latex_repr()))
+    simple = LA.simple_repr()
+    lines.append('\\begin{tiny}' + simple + ' (this line included for string searching purposes) \\end{tiny}')
     LA.print_soln_brackets(lines)
-    lines.append("\nOriginal brackets:\n")
+    lines.append("Original brackets:")
     LA.print_orig_brackets(lines)
-    lines.append("\nNon-trivial Jacobi Tests:\n")
-    #Y_test(LA)
-    LA.print_jacobi_tests(lines)
-    LA.print_groebner(lines)
+    if len(LA.jacobi_tests.items()) == 0:
+        lines.append('No non-trivial Jacobi tests')
+    else:
+        lines.append("Non-trivial Jacobi Tests:")
+        LA.print_jacobi_tests(lines)
+        LA.print_groebner(lines)
 
     if verbose:
         print_U_matrix(LA, lines)
@@ -613,8 +677,24 @@ def print_latex(LAs):
     lines.append('\\begin{document}')
     #lines.append('\\begin{multicols}{2}')
 
+    lines.append('\\title{Computation of positively graded filiform Lie algebras over ' + domain + '}')
+
+    lines.append('\\author{John Edwards\\\\Utah State University \\and Cameron Krome\\\\Idaho State University \\and Tracy Payne\\\\Idaho State University}')
+
+    lines.append('\\maketitle')
+
+    lines.append('\\section*{Summary table (starting on the next page)}')
+    lines.append('\\underline{Explanation of table}')
+    lines.append('\\begin{itemize}')
+    lines.append('\\item Column 1 (search) - A character string for text searching purposes')
+    lines.append('\\item Column 2 (algebra) - The subclass of positively graded filiform Lie algebra(s)')
+    lines.append('\\item Column 3 (Jac) - A check indicates that the class is nonempty')
+    lines.append('\\item Column 4 (sol) -  Number of Lie algebras in the class')
+    lines.append('\\end{itemize}')
+
+    lines.append('\\newpage')
     lines.append('\\begin{multicols}{2}')
-    
+
     n = len(LAs)
     num_per_col = 42
     for i in range((n//num_per_col)+1):
@@ -662,10 +742,11 @@ def print_latex(LAs):
 
     lines.append('\\end{multicols}')
 
-    lines.append('Jac = Jacobi tests are consistent\\\\')
-    lines.append('lin = Equations in Groebner basis are linear\\\\')
-    lines.append('sol = Found solution\\\\')
+    #lines.append('Jac = Jacobi tests are consistent\\\\')
+    #lines.append('lin = Equations in Groebner basis are linear\\\\')
+    #lines.append('sol = Found solution\\\\')
 
+    lines.append('\\section*{Algebra details}')
     for LA in LAs:
         verbose = False
         lines.append(print_LA(LA, verbose))
@@ -750,6 +831,7 @@ def extendLA(LA, d, extType):
         j = j-1
 
     ext.create_jacobi_tests()
+    print('.', end='', flush=True)
     return ext
 
 def extendRecursively(LA, extensions, maxDimension):
@@ -801,8 +883,12 @@ def create_L(dimension):
     return LA
 
 
+import time
 def __main__():
-    max_dim = 10
+    # Start the timer
+    t0 = time.perf_counter()
+
+    max_dim = 16
     Ls = [create_L(n) for n in range(4, max_dim)]
 #    Ls = [create_L(n) for n in [8]]
 
@@ -810,7 +896,12 @@ def __main__():
 
     for L in Ls:
         print('Extending {}'.format(L.simple_repr()))
+        #verbose = L.simple_repr() == 'm7A211'
         found.extend(extendStandard(LA=L, maxDimension=max_dim))
+
+    t1 = time.perf_counter() 
+    print('Elapsed time: {}'.format(t1-t0))
+    print('Number of algebras found: {}'.format(len(found)))
 
     # sort algebras in order of dimension and output
     #found.sort(key=lambda la: (la.dimension, la.d, la.extension, la.type))
